@@ -530,7 +530,7 @@ const CSV_FILE = 'aggregated_results.csv';
 let DATA = [];
 let currentView = 'cards';
 let currentSort = 'bilheteria';
-let sortDir = -1;
+let sortDir = 1; // 1 = descending always
 
 function fmt(n) {
   if (n >= 1e6) return 'R$ ' + (n/1e6).toFixed(1) + 'M';
@@ -556,8 +556,8 @@ function setView(v) {
 }
 
 function setSort(s) {
-  if (currentSort === s) sortDir *= -1;
-  else { currentSort = s; sortDir = 1; } // 1 = descending (biggest/most recent first)
+  currentSort = s; // always reset to descending, never toggle
+  sortDir = 1;
   document.querySelectorAll('[data-sort]').forEach(b => b.classList.toggle('active', b.dataset.sort === s));
 
   // Reset all table headers
@@ -565,12 +565,8 @@ function setSort(s) {
     th.classList.remove('sorted');
     th.textContent = th.textContent.replace(' ↓','').replace(' ↑','');
   });
-  // Highlight active column header
   const th = document.getElementById('th-' + s);
-  if (th) {
-    th.classList.add('sorted');
-    th.textContent += sortDir === 1 ? ' ↓' : ' ↑';
-  }
+  if (th) { th.classList.add('sorted'); th.textContent += ' ↓'; }
 
   render();
 }
@@ -664,28 +660,27 @@ function renderCards() {
 
 function renderTable() {
   const data = getFiltered();
-  // column index → td index inside each row (matches the <td> order)
-  const colIndex = { bilheteria: 2, publico: 3, sessoes: 4, ocupacao: 5, maxSalas: 6, estreia: 8 };
+  // sort key → 1-based nth-child index matching the <td> order
+  const colNth = { bilheteria: 3, publico: 4, sessoes: 5, ocupacao: 6, maxSalas: 7, estreia: 9 };
 
-  document.getElementById('tableBody').innerHTML = data.map((d) => {
-    const globalRank = DATA.findIndex(x => x.titulo === d.titulo) + 1;
+  document.getElementById('tableBody').innerHTML = data.map((d, i) => {
     return `<tr>
-      <td class="td-rank">${globalRank}</td>
+      <td class="td-rank">${i + 1}</td>
       <td class="td-title">${d.titulo}</td>
-      <td class="td-money">${fmtFull(d.bilheteria)}</td>
-      <td class="td-num">${fmtNum(d.publico)}</td>
-      <td class="td-num">${fmtNum(d.sessoes)}</td>
-      <td class="td-pct"><span class="pct-pill">${d.ocupacao.toFixed(1)}%</span></td>
-      <td class="td-num">${fmtNum(d.maxSalas)}</td>
+      <td class="td-money">${d.bilheteria ? fmtFull(d.bilheteria) : '—'}</td>
+      <td class="td-num">${d.publico ? fmtNum(d.publico) : '—'}</td>
+      <td class="td-num">${d.sessoes ? fmtNum(d.sessoes) : '—'}</td>
+      <td class="td-pct">${d.ocupacao ? '<span class="pct-pill">' + d.ocupacao.toFixed(1) + '%</span>' : '—'}</td>
+      <td class="td-num">${d.maxSalas ? fmtNum(d.maxSalas) : '—'}</td>
       <td class="td-dist">${d.distribuidora || '—'}</td>
       <td class="td-num">${d.estreia || '—'}</td>
     </tr>`;
   }).join('');
 
-  // Highlight the active sort column in yellow after DOM is built
-  const activeColIdx = colIndex[currentSort];
-  if (activeColIdx !== undefined) {
-    document.querySelectorAll(`#tableBody tr td:nth-child(${activeColIdx + 1})`).forEach(td => {
+  // Apply yellow highlight only to the active sort column
+  const nth = colNth[currentSort];
+  if (nth) {
+    document.querySelectorAll(`#tableBody tr td:nth-child(${nth})`).forEach(td => {
       td.classList.add('col-highlight');
     });
   }
@@ -724,20 +719,22 @@ function parseCSV(text) {
     if (!line) continue;
     const cells = splitCSVLine(line);
 
-    const bilh = parseFloat(cells[iBilh]);
-    if (!bilh || isNaN(bilh)) continue; // skip rows with no box office data
+    const titulo = (cells[iTitle] || '').trim();
+    if (!titulo) continue; // skip completely empty rows
+
+    const bilh = parseFloat(cells[iBilh]) || 0;
 
     rows.push({
-      titulo:       (cells[iTitle]  || '').trim(),
+      titulo,
       estreia:      (cells[iEstreia]|| '').trim(),
       distribuidora:(cells[iDist]   || '').trim(),
       bilheteria:   bilh,
-      publico:      parseInt(cells[iPub])  || 0,
-      sessoes:      parseInt(cells[iSess]) || 0,
+      publico:      parseInt(cells[iPub])    || 0,
+      sessoes:      parseInt(cells[iSess])   || 0,
       ocupacao:     parseFloat(cells[iOcup]) || 0,
-      maxSalas:     parseInt(cells[iSalas]) || 0,
-      municipios:   parseInt(cells[iMunic]) || 0,
-      pais:         (cells[iPais]   || 'Brasil').trim() || 'Brasil',
+      maxSalas:     parseInt(cells[iSalas])  || 0,
+      municipios:   parseInt(cells[iMunic])  || 0,
+      pais:         (cells[iPais]   || '').trim(),
       comentarios:  (cells[iComent] || '').trim(),
     });
   }
