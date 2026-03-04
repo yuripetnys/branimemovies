@@ -649,7 +649,6 @@ function renderCards() {
   }
   document.getElementById('emptyMsg').style.display = 'none';
   document.getElementById('cardsGrid').innerHTML = data.map((d, i) => {
-    // Top 4 metrics: Bilheteria, Público, Estreia, Ocupação (only if present)
     const metrics = [
       d.bilheteria ? `<div class="metric"><div class="metric-label">Bilheteria</div><div class="metric-value highlight">${fmt(d.bilheteria)}</div></div>` : '',
       d.publico    ? `<div class="metric"><div class="metric-label">Público</div><div class="metric-value">${fmtNum(d.publico)}</div></div>` : '',
@@ -658,9 +657,15 @@ function renderCards() {
     ].filter(Boolean).join('');
 
     const meta = [
+      d.sessoes    ? `<span>🎬 ${fmtNum(d.sessoes)} sessões</span>` : '',
       d.municipios ? `<span>🏙 ${fmtNum(d.municipios)} municípios</span>` : '',
       d.maxSalas   ? `<span>🎦 ${fmtNum(d.maxSalas)} salas máx.</span>` : '',
     ].filter(Boolean).join('');
+
+    // Auto-link URLs in comments
+    const linkedComment = d.comentarios
+      ? d.comentarios.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:underline;word-break:break-all;">$1</a>')
+      : '';
 
     return `
     <div class="card" style="animation-delay:${Math.min(i,20)*0.03}s">
@@ -670,7 +675,7 @@ function renderCards() {
       ${metrics ? `<div class="card-metrics">${metrics}</div>` : ''}
       <div class="card-bar"><div class="card-bar-fill" style="width:100%"></div></div>
       ${meta ? `<div class="card-meta">${meta}</div>` : ''}
-      ${d.comentarios ? `<div class="card-comment">${d.comentarios}</div>` : ''}
+      ${linkedComment ? `<div class="card-comment">${linkedComment}</div>` : ''}
     </div>`;
   }).join('');
 }
