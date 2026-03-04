@@ -557,7 +557,7 @@ function setView(v) {
 
 function setSort(s) {
   if (currentSort === s) sortDir *= -1;
-  else { currentSort = s; sortDir = -1; } // always descending on first click
+  else { currentSort = s; sortDir = 1; } // 1 = descending (biggest/most recent first)
   document.querySelectorAll('[data-sort]').forEach(b => b.classList.toggle('active', b.dataset.sort === s));
 
   // Reset all table headers
@@ -569,11 +569,8 @@ function setSort(s) {
   const th = document.getElementById('th-' + s);
   if (th) {
     th.classList.add('sorted');
-    th.textContent += sortDir === -1 ? ' ↓' : ' ↑';
+    th.textContent += sortDir === 1 ? ' ↓' : ' ↑';
   }
-
-  // Highlight active column cells
-  document.querySelectorAll('td.col-highlight').forEach(td => td.classList.remove('col-highlight'));
 
   render();
 }
@@ -582,15 +579,11 @@ function getFiltered() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   let data = DATA.filter(d => !q || d.titulo.toLowerCase().includes(q) || d.distribuidora.toLowerCase().includes(q));
   data.sort((a, b) => {
-    let av = a[currentSort], bv = b[currentSort];
-    // Dates: compare as strings (ISO format sorts correctly)
-    if (currentSort === 'estreia') {
-      av = av || '';
-      bv = bv || '';
-      return sortDir * bv.localeCompare(av); // descending = most recent first
-    }
-    if (typeof av === 'string') return sortDir * av.localeCompare(bv);
-    return sortDir * (bv - av);
+    const av = a[currentSort] ?? '';
+    const bv = b[currentSort] ?? '';
+    // sortDir=1 → descending (b before a), sortDir=-1 → ascending (a before b)
+    if (typeof av === 'number') return sortDir === 1 ? bv - av : av - bv;
+    return sortDir === 1 ? String(bv).localeCompare(String(av)) : String(av).localeCompare(String(bv));
   });
   return data;
 }
@@ -671,25 +664,31 @@ function renderCards() {
 
 function renderTable() {
   const data = getFiltered();
-  // Map sort key → column index (0-based, excluding rank col)
+  // column index → td index inside each row (matches the <td> order)
   const colIndex = { bilheteria: 2, publico: 3, sessoes: 4, ocupacao: 5, maxSalas: 6, estreia: 8 };
-  const activeCol = colIndex[currentSort];
 
-  document.getElementById('tableBody').innerHTML = data.map((d, i) => {
+  document.getElementById('tableBody').innerHTML = data.map((d) => {
     const globalRank = DATA.findIndex(x => x.titulo === d.titulo) + 1;
-    const hl = (idx) => activeCol === idx ? ' col-highlight' : '';
     return `<tr>
       <td class="td-rank">${globalRank}</td>
       <td class="td-title">${d.titulo}</td>
-      <td class="td-money${hl(2)}">${fmtFull(d.bilheteria)}</td>
-      <td class="td-num${hl(3)}">${fmtNum(d.publico)}</td>
-      <td class="td-num${hl(4)}">${fmtNum(d.sessoes)}</td>
-      <td class="td-pct${hl(5)}"><span class="pct-pill">${d.ocupacao.toFixed(1)}%</span></td>
-      <td class="td-num${hl(6)}">${fmtNum(d.maxSalas)}</td>
+      <td class="td-money">${fmtFull(d.bilheteria)}</td>
+      <td class="td-num">${fmtNum(d.publico)}</td>
+      <td class="td-num">${fmtNum(d.sessoes)}</td>
+      <td class="td-pct"><span class="pct-pill">${d.ocupacao.toFixed(1)}%</span></td>
+      <td class="td-num">${fmtNum(d.maxSalas)}</td>
       <td class="td-dist">${d.distribuidora || '—'}</td>
-      <td class="td-num${hl(8)}">${d.estreia || '—'}</td>
+      <td class="td-num">${d.estreia || '—'}</td>
     </tr>`;
   }).join('');
+
+  // Highlight the active sort column in yellow after DOM is built
+  const activeColIdx = colIndex[currentSort];
+  if (activeColIdx !== undefined) {
+    document.querySelectorAll(`#tableBody tr td:nth-child(${activeColIdx + 1})`).forEach(td => {
+      td.classList.add('col-highlight');
+    });
+  }
 }
 
 function render() {
