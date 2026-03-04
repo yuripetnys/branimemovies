@@ -588,26 +588,38 @@ function renderStats() {
   const totalBilh = DATA.reduce((s,d) => s + d.bilheteria, 0);
   const totalPub = DATA.reduce((s,d) => s + d.publico, 0);
   const totalSess = DATA.reduce((s,d) => s + d.sessoes, 0);
-  const avgOcup = (DATA.reduce((s,d) => s + d.ocupacao, 0) / DATA.length).toFixed(1);
+  const avgOcup = (DATA.filter(d => d.ocupacao > 0).reduce((s,d) => s + d.ocupacao, 0) / DATA.filter(d => d.ocupacao > 0).length).toFixed(1);
   document.getElementById('statsBar').innerHTML = `
     <div class="stat-block"><div class="stat-label">Bilheteria Total</div><div class="stat-value">${fmt(totalBilh)}</div></div>
     <div class="stat-block"><div class="stat-label">Espectadores</div><div class="stat-value">${fmtNum(totalPub)}</div></div>
     <div class="stat-block"><div class="stat-label">Sessões</div><div class="stat-value">${fmtNum(totalSess)}</div></div>
-    <div class="stat-block"><div class="stat-label">Ocupação Média</div><div class="stat-value red">${avgOcup}%</div></div>
+    <div class="stat-block"><div class="stat-label" title="Média de pessoas por sessão">Ocupação Média ⓘ</div><div class="stat-value red">${avgOcup}</div></div>
     <div class="stat-block"><div class="stat-label">Filmes</div><div class="stat-value">${DATA.length}</div></div>
   `;
 }
 
 function renderChart() {
-  const data = getFiltered().slice(0, 15);
-  const max = data[0]?.bilheteria || 1;
+  const data = getFiltered().filter(d => d[currentSort] > 0).slice(0, 15);
+  const max = data[0]?.[currentSort] || 1;
+
+  const chartField = currentSort === 'publico' ? 'publico'
+                   : currentSort === 'estreia'  ? 'bilheteria' // date sort → still show bilheteria values
+                   : 'bilheteria';
+
+  const fmtVal = (d) => chartField === 'publico' ? fmtNum(d.publico) : fmt(d.bilheteria);
+  const barVal = (d) => chartField === 'publico' ? d.publico : d.bilheteria;
+  const maxVal = Math.max(...data.map(barVal)) || 1;
+
+  const label = currentSort === 'publico' ? 'Top 15 · Público Total' : 'Top 15 · Bilheteria Total (R$)';
+  document.querySelector('#chartView .section-title').textContent = label;
+
   document.getElementById('barChart').innerHTML = data.map((d, i) => `
-    <div class="bar-row" title="${fmtFull(d.bilheteria)}">
+    <div class="bar-row" title="${fmtVal(d)}">
       <div class="bar-name"><span class="bar-rank">${String(i+1).padStart(2,'0')}</span>${d.titulo}</div>
       <div class="bar-track">
-        <div class="bar-fill ${i === 0 ? 'gold' : ''}" style="width:${(d.bilheteria/max*100).toFixed(1)}%; animation-delay:${i*0.04}s"></div>
+        <div class="bar-fill ${i === 0 ? 'gold' : ''}" style="width:${(barVal(d)/maxVal*100).toFixed(1)}%; animation-delay:${i*0.04}s"></div>
       </div>
-      <div class="bar-val">${fmt(d.bilheteria)}</div>
+      <div class="bar-val">${fmtVal(d)}</div>
     </div>
   `).join('');
 }
@@ -634,8 +646,6 @@ function renderCards() {
       d.estreia    ? `<span>📅 ${d.estreia}</span>` : '',
       d.municipios ? `<span>🏙 ${fmtNum(d.municipios)} municípios</span>` : '',
       d.maxSalas   ? `<span>🎦 ${fmtNum(d.maxSalas)} salas máx.</span>` : '',
-      d.distribuidora ? `<span>🏢 ${d.distribuidora}</span>` : '',
-      d.pais       ? `<span>🌐 ${d.pais}</span>` : '',
     ].filter(Boolean).join('');
 
     const barWidth = maxB > 0 && d.bilheteria ? (d.bilheteria / maxB * 100).toFixed(2) : '0';
@@ -643,6 +653,7 @@ function renderCards() {
     return `
     <div class="card" style="animation-delay:${Math.min(i,20)*0.03}s">
       <div class="card-rank">${String(i + 1).padStart(2,'0')}</div>
+      <div class="card-badge">${d.distribuidora || 'N/A'}</div>
       <div class="card-title">${d.titulo}</div>
       ${metrics ? `<div class="card-metrics">${metrics}</div>` : ''}
       ${barWidth > 0 ? `<div class="card-bar"><div class="card-bar-fill" style="width:${barWidth}%"></div></div>` : ''}
