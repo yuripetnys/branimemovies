@@ -511,7 +511,7 @@
             <th onclick="setSort('bilheteria')" id="th-bilheteria" class="sorted">Bilheteria ↓</th>
             <th onclick="setSort('publico')" id="th-publico">Público</th>
             <th onclick="setSort('sessoes')" id="th-sessoes">Sessões</th>
-            <th onclick="setSort('ocupacao')" id="th-ocupacao">Ocupação %</th>
+            <th onclick="setSort('ocupacao')" id="th-ocupacao" title="Média de pessoas por sessão">Ocupação ⓘ</th>
             <th onclick="setSort('maxSalas')" id="th-maxSalas">Máx. Salas</th>
             <th>Distribuidora</th>
             <th onclick="setSort('estreia')" id="th-estreia">Estreia</th>
@@ -622,38 +622,31 @@ function renderCards() {
   }
   document.getElementById('emptyMsg').style.display = 'none';
   document.getElementById('cardsGrid').innerHTML = data.map((d, i) => {
-    const globalRank = DATA.findIndex(x => x.titulo === d.titulo) + 1;
+    // Only build metric blocks for fields that exist
+    const metrics = [
+      d.bilheteria ? `<div class="metric"><div class="metric-label">Bilheteria</div><div class="metric-value highlight">${fmt(d.bilheteria)}</div></div>` : '',
+      d.publico    ? `<div class="metric"><div class="metric-label">Público</div><div class="metric-value">${fmtNum(d.publico)}</div></div>` : '',
+      d.sessoes    ? `<div class="metric"><div class="metric-label">Sessões</div><div class="metric-value">${fmtNum(d.sessoes)}</div></div>` : '',
+      d.ocupacao   ? `<div class="metric"><div class="metric-label" title="Média de pessoas por sessão">Ocupação ⓘ</div><div class="metric-value">${d.ocupacao.toFixed(1)}</div></div>` : '',
+    ].filter(Boolean).join('');
+
+    const meta = [
+      d.estreia    ? `<span>📅 ${d.estreia}</span>` : '',
+      d.municipios ? `<span>🏙 ${fmtNum(d.municipios)} municípios</span>` : '',
+      d.maxSalas   ? `<span>🎦 ${fmtNum(d.maxSalas)} salas máx.</span>` : '',
+      d.distribuidora ? `<span>🏢 ${d.distribuidora}</span>` : '',
+      d.pais       ? `<span>🌐 ${d.pais}</span>` : '',
+    ].filter(Boolean).join('');
+
+    const barWidth = maxB > 0 && d.bilheteria ? (d.bilheteria / maxB * 100).toFixed(2) : '0';
+
     return `
     <div class="card" style="animation-delay:${Math.min(i,20)*0.03}s">
-      <div class="card-rank">${String(globalRank).padStart(2,'0')}</div>
-      <div class="card-badge">${d.distribuidora || 'S/D'}</div>
+      <div class="card-rank">${String(i + 1).padStart(2,'0')}</div>
       <div class="card-title">${d.titulo}</div>
-      <div class="card-metrics">
-        <div class="metric">
-          <div class="metric-label">Bilheteria</div>
-          <div class="metric-value highlight">${fmt(d.bilheteria)}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Público</div>
-          <div class="metric-value">${fmtNum(d.publico)}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Sessões</div>
-          <div class="metric-value">${fmtNum(d.sessoes)}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Ocupação</div>
-          <div class="metric-value">${d.ocupacao.toFixed(1)}%</div>
-        </div>
-      </div>
-      <div class="card-bar">
-        <div class="card-bar-fill" style="width:${(d.bilheteria/maxB*100).toFixed(2)}%"></div>
-      </div>
-      <div class="card-meta">
-        <span>📅 ${d.estreia || '—'}</span>
-        <span>🏙 ${fmtNum(d.municipios)} municípios</span>
-        <span>🎦 ${fmtNum(d.maxSalas)} salas máx.</span>
-      </div>
+      ${metrics ? `<div class="card-metrics">${metrics}</div>` : ''}
+      ${barWidth > 0 ? `<div class="card-bar"><div class="card-bar-fill" style="width:${barWidth}%"></div></div>` : ''}
+      ${meta ? `<div class="card-meta">${meta}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -670,7 +663,7 @@ function renderTable() {
       <td class="td-money">${d.bilheteria ? fmtFull(d.bilheteria) : '—'}</td>
       <td class="td-num">${d.publico ? fmtNum(d.publico) : '—'}</td>
       <td class="td-num">${d.sessoes ? fmtNum(d.sessoes) : '—'}</td>
-      <td class="td-pct">${d.ocupacao ? '<span class="pct-pill">' + d.ocupacao.toFixed(1) + '%</span>' : '—'}</td>
+      <td class="td-pct">${d.ocupacao ? '<span class="pct-pill" title="Média de pessoas por sessão">' + d.ocupacao.toFixed(1) + '</span>' : '—'}</td>
       <td class="td-num">${d.maxSalas ? fmtNum(d.maxSalas) : '—'}</td>
       <td class="td-dist">${d.distribuidora || '—'}</td>
       <td class="td-num">${d.estreia || '—'}</td>
