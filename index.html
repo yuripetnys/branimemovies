@@ -376,6 +376,16 @@
     flex-wrap: wrap;
   }
 
+  .card-comment {
+    margin-top: 12px;
+    font-size: 10px;
+    color: var(--muted);
+    font-style: italic;
+    border-left: 2px solid var(--red-dim);
+    padding-left: 8px;
+    line-height: 1.5;
+  }
+
   /* TABLE VIEW */
   .table-wrap {
     overflow-x: auto;
@@ -577,8 +587,13 @@ function getFiltered() {
   data.sort((a, b) => {
     const av = a[currentSort] ?? '';
     const bv = b[currentSort] ?? '';
-    // sortDir=1 → descending (b before a), sortDir=-1 → ascending (a before b)
     if (typeof av === 'number') return sortDir === 1 ? bv - av : av - bv;
+    // For date strings: empty values always sink to the bottom
+    if (currentSort === 'estreia') {
+      if (!av && !bv) return 0;
+      if (!av) return 1;
+      if (!bv) return -1;
+    }
     return sortDir === 1 ? String(bv).localeCompare(String(av)) : String(av).localeCompare(String(bv));
   });
   return data;
@@ -634,21 +649,18 @@ function renderCards() {
   }
   document.getElementById('emptyMsg').style.display = 'none';
   document.getElementById('cardsGrid').innerHTML = data.map((d, i) => {
-    // Only build metric blocks for fields that exist
+    // Top 4 metrics: Bilheteria, Público, Estreia, Ocupação (only if present)
     const metrics = [
       d.bilheteria ? `<div class="metric"><div class="metric-label">Bilheteria</div><div class="metric-value highlight">${fmt(d.bilheteria)}</div></div>` : '',
       d.publico    ? `<div class="metric"><div class="metric-label">Público</div><div class="metric-value">${fmtNum(d.publico)}</div></div>` : '',
-      d.sessoes    ? `<div class="metric"><div class="metric-label">Sessões</div><div class="metric-value">${fmtNum(d.sessoes)}</div></div>` : '',
+      d.estreia    ? `<div class="metric"><div class="metric-label">Estreia</div><div class="metric-value">${d.estreia}</div></div>` : '',
       d.ocupacao   ? `<div class="metric"><div class="metric-label" title="Média de pessoas por sessão">Ocupação ⓘ</div><div class="metric-value">${d.ocupacao.toFixed(1)}</div></div>` : '',
     ].filter(Boolean).join('');
 
     const meta = [
-      d.estreia    ? `<span>📅 ${d.estreia}</span>` : '',
       d.municipios ? `<span>🏙 ${fmtNum(d.municipios)} municípios</span>` : '',
       d.maxSalas   ? `<span>🎦 ${fmtNum(d.maxSalas)} salas máx.</span>` : '',
     ].filter(Boolean).join('');
-
-    const barWidth = maxB > 0 && d.bilheteria ? (d.bilheteria / maxB * 100).toFixed(2) : '0';
 
     return `
     <div class="card" style="animation-delay:${Math.min(i,20)*0.03}s">
@@ -656,8 +668,9 @@ function renderCards() {
       <div class="card-badge">${d.distribuidora || 'N/A'}</div>
       <div class="card-title">${d.titulo}</div>
       ${metrics ? `<div class="card-metrics">${metrics}</div>` : ''}
-      ${barWidth > 0 ? `<div class="card-bar"><div class="card-bar-fill" style="width:${barWidth}%"></div></div>` : ''}
+      <div class="card-bar"><div class="card-bar-fill" style="width:100%"></div></div>
       ${meta ? `<div class="card-meta">${meta}</div>` : ''}
+      ${d.comentarios ? `<div class="card-comment">${d.comentarios}</div>` : ''}
     </div>`;
   }).join('');
 }
