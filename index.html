@@ -307,6 +307,14 @@
     line-height: 1;
   }
 
+  .card-header-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
   .card-badge {
     display: inline-block;
     font-size: 9px;
@@ -315,8 +323,24 @@
     padding: 3px 8px;
     border: 1px solid var(--red);
     color: var(--red);
-    margin-bottom: 10px;
   }
+
+  .classind-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 900;
+    color: white;
+    font-family: var(--font-jp);
+    flex-shrink: 0;
+    cursor: default;
+  }
+
+  .td-classind { text-align: center; }
 
   .card-title {
     font-family: var(--font-jp);
@@ -574,6 +598,7 @@
   <div class="btn-group">
     <button class="btn active" data-sort="bilheteria" onclick="setSort('bilheteria')">Bilheteria</button>
     <button class="btn" data-sort="publico" onclick="setSort('publico')">Público</button>
+    <button class="btn" data-sort="pmi" onclick="setSort('pmi')">P.M.I.</button>
     <button class="btn" data-sort="estreia" onclick="setSort('estreia')">Mais Recente</button>
   </div>
   <div class="spacer"></div>
@@ -602,8 +627,10 @@
             <th onclick="setSort('publico')" id="th-publico">Público</th>
             <th onclick="setSort('sessoes')" id="th-sessoes">Sessões</th>
             <th onclick="setSort('ocupacao')" id="th-ocupacao" title="Média de pessoas por sessão">Ocupação ⓘ</th>
+            <th onclick="setSort('pmi')" id="th-pmi" title="Preço Médio Ingresso">P.M.I.</th>
             <th onclick="setSort('maxSalas')" id="th-maxSalas">Máx. Salas</th>
             <th>Distribuidora</th>
+            <th>Class.</th>
             <th onclick="setSort('estreia')" id="th-estreia">Estreia</th>
           </tr>
         </thead>
@@ -686,7 +713,7 @@ function renderStats() {
   const avgOcup = (DATA.filter(d => d.ocupacao > 0).reduce((s,d) => s + d.ocupacao, 0) / DATA.filter(d => d.ocupacao > 0).length).toFixed(1);
   document.getElementById('statsBar').innerHTML = `
     <div class="stat-block"><div class="stat-label">Bilheteria Total</div><div class="stat-value">${fmt(totalBilh)}</div></div>
-    <div class="stat-block"><div class="stat-label">Espectadores</div><div class="stat-value">${fmtNum(totalPub)}</div></div>
+    <div class="stat-block"><div class="stat-label">Espectadores</div><div class="stat-value">${(totalPub/1e6).toFixed(1)}M</div></div>
     <div class="stat-block"><div class="stat-label">Sessões</div><div class="stat-value">${fmtNum(totalSess)}</div></div>
     <div class="stat-block"><div class="stat-label" title="Média de pessoas por sessão">Ocupação Média ⓘ</div><div class="stat-value red">${avgOcup}</div></div>
     <div class="stat-block"><div class="stat-label">Filmes</div><div class="stat-value">${DATA.length}</div></div>
@@ -719,6 +746,23 @@ function renderChart() {
   `).join('');
 }
 
+// ─── ClassInd badge ─────────────────────────────────────────────────────────
+const CLASSIND = {
+  'L':  { bg: '#1a8a3a', label: 'L'  },
+  '10': { bg: '#1a6eb5', label: '10' },
+  '12': { bg: '#b8860b', label: '12' },
+  '14': { bg: '#d4622a', label: '14' },
+  '16': { bg: '#c0171b', label: '16' },
+  '18': { bg: '#111111', label: '18' },
+};
+
+function classindBadge(rating) {
+  if (!rating) return '';
+  const r = CLASSIND[rating];
+  if (!r) return '';
+  return `<span class="classind-badge" style="background:${r.bg}" title="Classificação indicativa: ${rating === 'L' ? 'Livre' : rating + ' anos'}">${r.label}</span>`;
+}
+
 function renderCards() {
   const data = getFiltered();
   const maxB = DATA[0].bilheteria;
@@ -734,6 +778,7 @@ function renderCards() {
       d.publico    ? `<div class="metric"><div class="metric-label">Público</div><div class="metric-value">${fmtNum(d.publico)}</div></div>` : '',
       d.estreia    ? `<div class="metric"><div class="metric-label">Estreia</div><div class="metric-value">${d.estreia}</div></div>` : '',
       d.ocupacao   ? `<div class="metric"><div class="metric-label" title="Média de pessoas por sessão">Ocupação ⓘ</div><div class="metric-value">${d.ocupacao.toFixed(1)}</div></div>` : '',
+      d.pmi        ? `<div class="metric"><div class="metric-label" title="Preço Médio Ingresso">P.M.I.</div><div class="metric-value">R$ ${d.pmi.toFixed(2)}</div></div>` : '',
     ].filter(Boolean).join('');
 
     const meta = [
@@ -750,7 +795,10 @@ function renderCards() {
     return `
     <div class="card" style="animation-delay:${Math.min(i,20)*0.03}s">
       <div class="card-rank">${String(i + 1).padStart(2,'0')}</div>
-      <div class="card-badge">${d.distribuidora || 'N/A'}</div>
+      <div class="card-header-row">
+        <div class="card-badge">${d.distribuidora || 'N/A'}</div>
+        ${classindBadge(d.classind)}
+      </div>
       <div class="card-title">${d.titulo}</div>
       ${metrics ? `<div class="card-metrics">${metrics}</div>` : ''}
       <div class="card-bar"><div class="card-bar-fill" style="width:100%"></div></div>
@@ -763,7 +811,7 @@ function renderCards() {
 function renderTable() {
   const data = getFiltered();
   // sort key → 1-based nth-child index matching the <td> order
-  const colNth = { bilheteria: 3, publico: 4, sessoes: 5, ocupacao: 6, maxSalas: 7, estreia: 9 };
+  const colNth = { bilheteria: 3, publico: 4, sessoes: 5, ocupacao: 6, pmi: 7, maxSalas: 8, estreia: 11 };
 
   document.getElementById('tableBody').innerHTML = data.map((d, i) => {
     return `<tr>
@@ -773,8 +821,10 @@ function renderTable() {
       <td class="td-num">${d.publico ? fmtNum(d.publico) : '—'}</td>
       <td class="td-num">${d.sessoes ? fmtNum(d.sessoes) : '—'}</td>
       <td class="td-pct">${d.ocupacao ? '<span class="pct-pill" title="Média de pessoas por sessão">' + d.ocupacao.toFixed(1) + '</span>' : '—'}</td>
+      <td class="td-money">${d.pmi ? 'R$ ' + d.pmi.toFixed(2) : '—'}</td>
       <td class="td-num">${d.maxSalas ? fmtNum(d.maxSalas) : '—'}</td>
       <td class="td-dist">${d.distribuidora || '—'}</td>
+      <td class="td-classind">${classindBadge(d.classind) || '—'}</td>
       <td class="td-num">${d.estreia || '—'}</td>
     </tr>`;
   }).join('');
@@ -806,14 +856,15 @@ function parseCSV(text) {
   const iTitle      = col('Título');
   const iEstreia    = col('Estreia');
   const iDist       = col('Distribuidora');
-  const iBilh       = col('Bilheteria Total');
-  const iPub        = col('Público Total');
+  const iBilh       = col('Bilheteria');
+  const iPub        = col('Público');
   const iSess       = col('Sessões');
   const iOcup       = col('Ocupação Média');
   const iSalas      = col('Máx. salas');
   const iMunic      = col('Municípios');
-  const iPais       = col('Países');
   const iComent     = col('Comentários');
+  const iClassInd   = col('ClassInd');
+  const iPMI        = col('P.M.I.');
 
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
@@ -826,17 +877,21 @@ function parseCSV(text) {
 
     const bilh = parseFloat(cells[iBilh]) || 0;
 
+    const pub   = parseInt(cells[iPub])    || 0;
+    const sess  = parseInt(cells[iSess])   || 0;
+
     rows.push({
       titulo,
       estreia:      (cells[iEstreia]|| '').trim(),
       distribuidora:(cells[iDist]   || '').trim(),
       bilheteria:   bilh,
-      publico:      parseInt(cells[iPub])    || 0,
-      sessoes:      parseInt(cells[iSess])   || 0,
+      publico:      pub,
+      sessoes:      sess,
       ocupacao:     parseFloat(cells[iOcup]) || 0,
+      pmi:          parseFloat(cells[iPMI])  || 0,
       maxSalas:     parseInt(cells[iSalas])  || 0,
       municipios:   parseInt(cells[iMunic])  || 0,
-      pais:         (cells[iPais]   || '').trim(),
+      classind:     (cells[iClassInd] || '').trim(),
       comentarios:  (cells[iComent] || '').trim(),
     });
   }
