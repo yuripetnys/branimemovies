@@ -273,7 +273,7 @@
   /* CARDS GRID */
   .cards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+    grid-template-columns: repeat(5, 1fr);
     gap: 1px;
     background: var(--border);
     border: 1px solid var(--border);
@@ -524,7 +524,8 @@
     letter-spacing: 0.1em;
   }
 
-  @keyframes pulse { from { opacity: 0.3; } to { opacity: 1; } }
+  @media (max-width: 1100px) { .cards-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 700px)  { .cards-grid { grid-template-columns: repeat(2, 1fr); } }
 
   /* View toggle icons */
   .view-icon { font-size: 14px; }
@@ -596,7 +597,6 @@
     }
 
     /* Cards: single column, tighter poster */
-    .cards-grid { grid-template-columns: 1fr; }
     .card-poster { flex: 0 0 70px; width: 70px; }
     .card-content { padding: 12px; }
     .card-title { font-size: 13px; }
