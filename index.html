@@ -273,81 +273,66 @@
   /* CARDS GRID */
   .cards-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
     gap: 1px;
     background: var(--border);
     border: 1px solid var(--border);
   }
 
+  /* ── Flip card wrapper ── */
   .card {
-    background: var(--bg2);
-    padding: 0;
-    position: relative;
-    overflow: hidden;
-    transition: background 0.2s;
+    perspective: 1000px;
+    min-height: 240px;
     animation: fadeUp 0.4s ease both;
-    display: flex;
-    align-items: stretch;
+    cursor: default;
   }
-
-  .card:hover { background: var(--surface); }
 
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(16px); }
     to { opacity: 1; transform: translateY(0); }
   }
 
-  /* Poster column */
-  .card-poster {
-    flex: 0 0 130px;
-    width: 130px;
+  .card-inner {
     position: relative;
-    background: var(--surface);
+    width: 100%;
+    height: 100%;
+    min-height: 240px;
+    transform-style: preserve-3d;
+    transition: transform 0.55s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  }
+
+  .card.flipped .card-inner { transform: rotateY(180deg); }
+
+  /* ── Shared face styles ── */
+  .card-front, .card-back {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
     overflow: hidden;
   }
 
-  .card-poster img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  .card-poster-placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-    color: var(--border);
-    background: var(--surface);
-  }
-
-  .card-rank {
-    position: absolute;
-    bottom: 4px;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-family: var(--font-jp);
-    font-size: 13px;
-    font-weight: 900;
-    color: white;
-    background: rgba(0,0,0,0.55);
-    padding: 2px 0;
-    line-height: 1.4;
-  }
-
-  /* Content column */
-  .card-content {
-    flex: 1;
-    min-width: 0;
-    padding: 16px 16px 14px;
+  /* ── FRONT ── */
+  .card-front {
+    background: var(--bg2);
     display: flex;
     flex-direction: column;
-    gap: 0;
+    padding: 20px;
   }
+
+  /* Dim poster as background */
+  .card-front-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    filter: brightness(0.1) blur(2px);
+    transform: scale(1.05); /* hide blur edges */
+    z-index: 0;
+  }
+
+  /* All front content sits above the bg */
+  .card-front > * { position: relative; z-index: 1; }
 
   .card-header-row {
     display: flex;
@@ -384,22 +369,28 @@
 
   .td-classind { text-align: center; }
 
+  .card-rank {
+    font-family: var(--font-jp);
+    font-size: 11px;
+    font-weight: 900;
+    color: var(--muted);
+    margin-bottom: 4px;
+    letter-spacing: 0.1em;
+  }
+
   .card-title {
     font-family: var(--font-jp);
     font-size: 14px;
     font-weight: 700;
     line-height: 1.3;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
   }
 
   .card-metrics {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-    margin-bottom: 0;
   }
-
-  .metric { }
 
   .metric-label {
     font-size: 9px;
@@ -410,7 +401,7 @@
   }
 
   .metric-value {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     color: var(--text);
   }
@@ -418,38 +409,106 @@
   .metric-value.highlight { color: var(--gold); }
 
   .card-bar {
-    margin-top: 10px;
+    margin-top: 12px;
     height: 2px;
-    background: var(--surface);
+    background: rgba(255,255,255,0.08);
     position: relative;
     overflow: hidden;
   }
 
   .card-bar-fill {
     position: absolute;
-    left: 0;
-    top: 0;
+    left: 0; top: 0;
     height: 100%;
     background: var(--red);
   }
 
   .card-meta {
-    margin-top: 14px;
+    margin-top: 10px;
     font-size: 10px;
     color: var(--muted);
     display: flex;
-    gap: 12px;
+    gap: 10px;
     flex-wrap: wrap;
   }
 
   .card-comment {
-    margin-top: 12px;
+    margin-top: 10px;
     font-size: 10px;
     color: var(--muted);
     font-style: italic;
     border-left: 2px solid var(--red-dim);
     padding-left: 8px;
     line-height: 1.5;
+  }
+
+  /* Flip button */
+  .card-flip-btn {
+    margin-top: auto;
+    padding-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .flip-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .flip-btn:hover { border-color: var(--red); color: var(--text); }
+
+  /* ── BACK ── */
+  .card-back {
+    transform: rotateY(180deg);
+    background: var(--bg);
+  }
+
+  .card-back img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
+    display: block;
+  }
+
+  /* Gradient scrim at bottom for text legibility */
+  .card-back-scrim {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 32px 16px 14px;
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .card-back-title {
+    font-family: var(--font-jp);
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+    line-height: 1.3;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .card-back-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    color: var(--border);
+    background: var(--surface);
   }
 
   /* TABLE VIEW */
@@ -524,9 +583,6 @@
     letter-spacing: 0.1em;
   }
 
-  @media (max-width: 1100px) { .cards-grid { grid-template-columns: repeat(3, 1fr); } }
-  @media (max-width: 700px)  { .cards-grid { grid-template-columns: repeat(2, 1fr); } }
-
   /* View toggle icons */
   .view-icon { font-size: 14px; }
 
@@ -596,10 +652,10 @@
       height: 14px;
     }
 
-    /* Cards: single column, tighter poster */
-    .card-poster { flex: 0 0 90px; width: 90px; }
-    .card-content { padding: 12px; }
+    /* Cards: single column on mobile */
+    .card-front { padding: 14px; }
     .card-title { font-size: 13px; }
+    .metric-value { font-size: 13px; }
 
     /* Table: hide less important columns, make it readable */
     .table-wrap { font-size: 11px; }
@@ -834,26 +890,44 @@ function renderCards() {
       : '';
 
     const posterSrc = d.cpb ? `posters/${d.cpb}.webp` : '';
-    const posterHTML = posterSrc
-      ? `<img src="${posterSrc}" alt="${d.titulo}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'card-poster-placeholder\\'>🎬</div>'">`
-      : `<div class="card-poster-placeholder">🎬</div>`;
+    const bgStyle   = posterSrc ? `style="background-image:url('${posterSrc}')"` : '';
+
+    const backFace = posterSrc
+      ? `<img src="${posterSrc}" alt="${d.titulo}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      : '';
+    const backPlaceholder = `<div class="card-back-placeholder" ${posterSrc ? 'style="display:none"' : ''}>🎬</div>`;
 
     return `
     <div class="card" style="animation-delay:${Math.min(i,20)*0.03}s">
-      <div class="card-poster">
-        ${posterHTML}
-        <div class="card-rank">${String(i + 1).padStart(2,'0')}</div>
-      </div>
-      <div class="card-content">
-        <div class="card-header-row">
-          <div class="card-badge">${d.distribuidora || 'N/A'}</div>
-          ${classindBadge(d.classind)}
+      <div class="card-inner">
+
+        <div class="card-front">
+          <div class="card-front-bg" ${bgStyle}></div>
+          <div class="card-rank"># ${String(i + 1).padStart(2,'0')}</div>
+          <div class="card-header-row">
+            <div class="card-badge">${d.distribuidora || 'N/A'}</div>
+            ${classindBadge(d.classind)}
+          </div>
+          <div class="card-title">${d.titulo}</div>
+          ${metrics ? `<div class="card-metrics">${metrics}</div>` : ''}
+          <div class="card-bar"><div class="card-bar-fill" style="width:100%"></div></div>
+          ${meta ? `<div class="card-meta">${meta}</div>` : ''}
+          ${linkedComment ? `<div class="card-comment">${linkedComment}</div>` : ''}
+          <div class="card-flip-btn">
+            <button class="flip-btn" onclick="this.closest('.card').classList.add('flipped')">VER ARTE ↩</button>
+          </div>
         </div>
-        <div class="card-title">${d.titulo}</div>
-        ${metrics ? `<div class="card-metrics">${metrics}</div>` : ''}
-        <div class="card-bar"><div class="card-bar-fill" style="width:100%"></div></div>
-        ${meta ? `<div class="card-meta">${meta}</div>` : ''}
-        ${linkedComment ? `<div class="card-comment">${linkedComment}</div>` : ''}
+
+        <div class="card-back">
+          ${backFace}
+          ${backPlaceholder}
+          <div class="card-back-scrim">
+            <div class="card-back-title">${d.titulo}</div>
+            ${classindBadge(d.classind)}
+            <button class="flip-btn" onclick="this.closest('.card').classList.remove('flipped')">↩ VOLTAR</button>
+          </div>
+        </div>
+
       </div>
     </div>`;
   }).join('');
