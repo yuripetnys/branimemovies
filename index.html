@@ -206,13 +206,18 @@
     padding: 28px 32px;
   }
 
-  .stat-bar-chart { display: flex; flex-direction: column; gap: 6px; }
+  .stat-svg-wrap {
+    width: 100%;
+    margin-top: 8px;
+  }
 
+  /* Distributor stacked bar rows */
   .stat-bar-row {
     display: grid;
     grid-template-columns: 60px 1fr 130px;
     gap: 12px;
     align-items: center;
+    margin-bottom: 6px;
   }
 
   .stat-bar-label {
@@ -221,24 +226,6 @@
     color: var(--muted);
     letter-spacing: 0.05em;
     text-align: right;
-  }
-
-  .stat-bar-track {
-    height: 20px;
-    background: var(--surface);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .stat-bar-fill {
-    position: absolute;
-    left: 0; top: 0;
-    height: 100%;
-    animation: barGrow 0.5s ease both;
-  }
-
-  @keyframes barGrow {
-    from { width: 0 !important; }
   }
 
   .stat-bar-val {
@@ -406,7 +393,7 @@
 
   .bar-row {
     display: grid;
-    grid-template-columns: 34px 280px 1fr 130px;
+    grid-template-columns: 50px 280px 1fr 130px;
     gap: 12px;
     align-items: center;
     cursor: pointer;
@@ -719,13 +706,13 @@
   }
 
   .poster-thumb-chart {
-    width: 23px;
-    height: 34px;
+    width: 33px;
+    height: 50px;
   }
 
   .poster-thumb-table {
-    width: 53px;
-    height: 80px;
+    width: 67px;
+    height: 100px;
   }
 
   .poster-thumb-placeholder {
@@ -782,10 +769,11 @@
   tr:hover td { background: var(--surface); }
 
   .td-rank { color: var(--red); font-weight: 700; text-align: center; width: 40px; }
+  .td-poster { width: 83px; padding: 4px 8px !important; }
   .td-title { font-weight: 700; max-width: 280px; }
-  .td-money { color: var(--gold); font-weight: 700; text-align: right; }
+  .td-money { font-weight: 700; text-align: right; color: var(--muted); }
   .td-num { color: var(--muted); text-align: right; }
-  .td-pct { text-align: right; }
+  .td-pct { text-align: right; color: var(--muted); }
   .td-dist { font-size: 10px; color: var(--muted); }
 
   /* Active sort column highlight */
@@ -793,11 +781,9 @@
 
   .pct-pill {
     display: inline-block;
-    background: var(--red);
-    color: white;
-    padding: 2px 6px;
-    font-size: 9px;
-    font-weight: 700;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
   }
 
   /* EMPTY */
@@ -1013,7 +999,10 @@ function setView(v) {
   document.getElementById('chartView').style.display = v === 'chart' ? 'block' : 'none';
   document.getElementById('cardsView').style.display = v === 'cards' ? 'block' : 'none';
   document.getElementById('tableView').style.display = v === 'table' ? 'block' : 'none';
-  render();
+  // Table defaults to público; everything else defaults to bilheteria
+  if (v === 'table' && currentSort === 'bilheteria') setSort('publico');
+  else if (v !== 'table' && currentSort === 'publico') setSort('bilheteria');
+  else render();
 }
 
 function setSort(s) {
@@ -1196,7 +1185,7 @@ function renderTable() {
       : `<div class="poster-thumb poster-thumb-table poster-thumb-placeholder">🎬</div>`;
     return `<tr>
       <td class="td-rank">${i + 1}</td>
-      <td style="padding:4px 8px;">${thumb}</td>
+      <td class="td-poster">${thumb}</td>
       <td class="td-title">${d.titulo}</td>
       <td class="td-money">${d.bilheteria ? fmtFull(d.bilheteria) : '—'}</td>
       <td class="td-num">${d.publico ? fmtNum(d.publico) : '—'}</td>
@@ -1374,52 +1363,121 @@ function renderMarkdown(md) {
 function renderStatisticas() {
   if (!DATA.length) return;
 
-  // Group by year — only commercial releases (publico > 0)
   const commercial = DATA.filter(d => d.publico > 0);
-  const years = [...new Set(commercial.map(d => d.estreia?.slice(0,4)).filter(Boolean))].sort();
+  const allYears = [...new Set(DATA.map(d => d.estreia?.slice(0,4)).filter(Boolean))].sort();
+  const commYears = [...new Set(commercial.map(d => d.estreia?.slice(0,4)).filter(Boolean))].sort();
 
   const byYear = y => commercial.filter(d => d.estreia?.startsWith(y));
 
-  // Chart helpers
-  const BAR_HEIGHT = 28;
-  const GAP = 8;
+  // ── Vertical bar chart (SVG) ────────────────────────────────────────────────
+  function verticalBarChart(rows, fmtFn, color = '#e63329') {
+    const W = 600, H = 200, PAD = { t: 12, r: 8, b: 36, l: 52 };
+    const chartW = W - PAD.l - PAD.r;
+    const chartH = H - PAD.t - PAD.b;
+    const max = Math.max(...rows.map(r => r.value)) || 1;
+    const barW = Math.floor(chartW / rows.length * 0.6);
+    const gap   = chartW / rows.length;
 
-  function svgBarChart(rows, valueKey, fmtFn, colorFn) {
-    const max = Math.max(...rows.map(r => r[valueKey])) || 1;
-    const W = 100; // % width
-    return rows.map((r, i) => {
-      const pct = (r[valueKey] / max * 100).toFixed(1);
-      const color = colorFn ? colorFn(i) : 'var(--red)';
-      return `
-        <div class="stat-bar-row">
-          <div class="stat-bar-label">${r.label}</div>
-          <div class="stat-bar-track">
-            <div class="stat-bar-fill" style="width:${pct}%;background:${color};animation-delay:${i*0.05}s"></div>
-          </div>
-          <div class="stat-bar-val">${fmtFn(r[valueKey])}</div>
-        </div>`;
+    // Y axis gridlines + labels
+    const ticks = 4;
+    const grids = Array.from({length: ticks + 1}, (_, i) => {
+      const v = max * i / ticks;
+      const y = PAD.t + chartH - (v / max * chartH);
+      return `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+              <text x="${PAD.l - 4}" y="${y + 4}" text-anchor="end" fill="#666" font-size="8">${fmtFn(v)}</text>`;
     }).join('');
+
+    const bars = rows.map((r, i) => {
+      const x = PAD.l + gap * i + gap / 2 - barW / 2;
+      const bh = (r.value / max) * chartH;
+      const y = PAD.t + chartH - bh;
+      const isMax = r.value === max;
+      return `
+        <rect x="${x}" y="${y}" width="${barW}" height="${bh}"
+              fill="${isMax ? '#c9a84c' : color}" rx="1"
+              opacity="0.9">
+          <title>${r.label}: ${fmtFn(r.value)}</title>
+        </rect>
+        <text x="${x + barW/2}" y="${H - PAD.b + 14}" text-anchor="middle" fill="#666" font-size="9">${r.label}</text>`;
+    }).join('');
+
+    return `<div class="stat-svg-wrap"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;overflow:visible">
+      ${grids}${bars}
+    </svg></div>`;
   }
 
-  // 1. Releases per year
-  const releasesRows = years.map(y => ({ label: y, value: byYear(y).length }));
+  // ── Line chart (SVG) ────────────────────────────────────────────────────────
+  function lineChart(rows, fmtFn) {
+    const W = 600, H = 180, PAD = { t: 12, r: 8, b: 36, l: 52 };
+    const chartW = W - PAD.l - PAD.r;
+    const chartH = H - PAD.t - PAD.b;
+    const min = Math.min(...rows.map(r => r.value)) * 0.85;
+    const max = Math.max(...rows.map(r => r.value)) * 1.05;
+    const range = max - min || 1;
 
-  // 2. Box office per year
-  const boxRows = years.map(y => ({
+    const pt = (r, i) => {
+      const x = PAD.l + (i / (rows.length - 1)) * chartW;
+      const y = PAD.t + chartH - ((r.value - min) / range) * chartH;
+      return `${x},${y}`;
+    };
+
+    const ticks = 4;
+    const grids = Array.from({length: ticks + 1}, (_, i) => {
+      const v = min + range * i / ticks;
+      const y = PAD.t + chartH - (i / ticks * chartH);
+      return `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+              <text x="${PAD.l - 4}" y="${y + 4}" text-anchor="end" fill="#666" font-size="8">${fmtFn(v)}</text>`;
+    }).join('');
+
+    const points = rows.map(pt).join(' ');
+
+    // Area fill — close path under the line
+    const firstX = PAD.l, lastX = PAD.l + chartW;
+    const baseY = PAD.t + chartH;
+    const area = `<polygon points="${firstX},${baseY} ${points} ${lastX},${baseY}" fill="url(#lineGrad)" opacity="0.3"/>`;
+
+    const dots = rows.map((r, i) => {
+      const [x, y] = pt(r, i).split(',');
+      return `<circle cx="${x}" cy="${y}" r="3" fill="#c9a84c">
+        <title>${r.label}: ${fmtFn(r.value)}</title>
+      </circle>`;
+    }).join('');
+
+    const labels = rows.map((r, i) => {
+      const x = PAD.l + (i / (rows.length - 1)) * chartW;
+      return `<text x="${x}" y="${H - PAD.b + 14}" text-anchor="middle" fill="#666" font-size="9">${r.label}</text>`;
+    }).join('');
+
+    return `<div class="stat-svg-wrap"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;overflow:visible">
+      <defs>
+        <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#c9a84c"/>
+          <stop offset="100%" stop-color="#c9a84c" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${grids}
+      ${area}
+      <polyline points="${points}" fill="none" stroke="#c9a84c" stroke-width="2" stroke-linejoin="round"/>
+      ${dots}${labels}
+    </svg></div>`;
+  }
+
+  // ── Data prep ───────────────────────────────────────────────────────────────
+  const releasesRows = commYears.map(y => ({ label: y, value: byYear(y).length }));
+
+  const boxRows = commYears.map(y => ({
     label: y,
     value: byYear(y).reduce((s,d) => s + d.bilheteria, 0)
   })).filter(r => r.value > 0);
 
-  // 3. Avg PMI per year
-  const pmiRows = years.map(y => {
+  const pmiRows = commYears.map(y => {
     const films = byYear(y).filter(d => d.pmi > 0);
     return { label: y, value: films.length ? films.reduce((s,d) => s + d.pmi, 0) / films.length : 0 };
   }).filter(r => r.value > 0);
 
-  // 4. Distributor market share per year — stacked % bar
+  // ── Distributor stacked bar ─────────────────────────────────────────────────
   function distShareHTML() {
-    const COLORS = ['#e63329','#c9a84c','#4a9eda','#6bcb77','#e8a838','#b56ce2','#e86060','#60c8e8','#c8e860'];
-    // Collect top distributors overall
+    const COLORS = ['#e63329','#c9a84c','#4a9eda','#6bcb77','#e8a838','#b56ce2','#e86060','#60c8e8'];
     const distTotals = {};
     commercial.forEach(d => {
       if (!d.distribuidora || !d.bilheteria) return;
@@ -1427,22 +1485,22 @@ function renderStatisticas() {
     });
     const topDists = Object.entries(distTotals).sort((a,b) => b[1]-a[1]).slice(0,8).map(e => e[0]);
 
-    const legend = topDists.map((d,i) =>
-      `<span class="dist-legend-item"><span class="dist-legend-dot" style="background:${COLORS[i]}"></span>${d}</span>`
-    ).join('');
+    const legend = [
+      ...topDists.map((d,i) => `<span class="dist-legend-item"><span class="dist-legend-dot" style="background:${COLORS[i]}"></span>${d}</span>`),
+      `<span class="dist-legend-item"><span class="dist-legend-dot" style="background:#444"></span>Outros</span>`
+    ].join('');
 
-    const bars = years.map(y => {
+    const bars = commYears.map(y => {
       const films = byYear(y).filter(d => d.bilheteria > 0);
       const total = films.reduce((s,d) => s + d.bilheteria, 0) || 1;
       const segments = topDists.map((dist, i) => {
         const share = films.filter(d => d.distribuidora === dist).reduce((s,d) => s + d.bilheteria, 0);
         const pct = (share / total * 100).toFixed(1);
-        return pct > 0 ? `<div class="dist-seg" style="width:${pct}%;background:${COLORS[i]}" title="${dist}: ${pct}%"></div>` : '';
+        return parseFloat(pct) > 0 ? `<div class="dist-seg" style="width:${pct}%;background:${COLORS[i]}" title="${dist}: ${pct}%"></div>` : '';
       }).join('');
       const otherShare = films.filter(d => !topDists.includes(d.distribuidora)).reduce((s,d) => s + d.bilheteria, 0);
       const otherPct = (otherShare / total * 100).toFixed(1);
-      const otherSeg = otherPct > 0 ? `<div class="dist-seg" style="width:${otherPct}%;background:#444" title="Outros: ${otherPct}%"></div>` : '';
-
+      const otherSeg = parseFloat(otherPct) > 0 ? `<div class="dist-seg" style="width:${otherPct}%;background:#444" title="Outros: ${otherPct}%"></div>` : '';
       return `
         <div class="stat-bar-row">
           <div class="stat-bar-label">${y}</div>
@@ -1454,20 +1512,20 @@ function renderStatisticas() {
     return `<div class="dist-legend">${legend}</div>${bars}`;
   }
 
-  const goldGrad = i => i === 0 ? 'var(--gold)' : 'var(--red)';
+  const fmtShort = v => v >= 1e6 ? 'R$' + (v/1e6).toFixed(0) + 'M' : v >= 1e3 ? (v/1e3).toFixed(0) + 'k' : String(Math.round(v));
 
   document.getElementById('estatisticasContent').innerHTML = `
     <div class="stat-chart-block">
       <div class="section-title">Lançamentos comerciais por ano</div>
-      <div class="stat-bar-chart">${svgBarChart(releasesRows, 'value', v => v + ' filmes', goldGrad)}</div>
+      ${verticalBarChart(releasesRows, v => Math.round(v) || '', '#e63329')}
     </div>
     <div class="stat-chart-block">
       <div class="section-title">Bilheteria total por ano</div>
-      <div class="stat-bar-chart">${svgBarChart(boxRows, 'value', fmt, goldGrad)}</div>
+      ${verticalBarChart(boxRows, fmtShort, '#e63329')}
     </div>
     <div class="stat-chart-block">
       <div class="section-title">P.M.I. médio por ano</div>
-      <div class="stat-bar-chart">${svgBarChart(pmiRows, 'value', v => 'R$ ' + v.toFixed(2), goldGrad)}</div>
+      ${lineChart(pmiRows, v => 'R$' + v.toFixed(0))}
     </div>
     <div class="stat-chart-block">
       <div class="section-title">Market share de distribuidoras por ano</div>
