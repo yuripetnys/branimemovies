@@ -93,7 +93,199 @@
     letter-spacing: 0.1em;
   }
 
-  /* STATS BAR */
+  /* NAV */
+  .site-nav {
+    display: flex;
+    gap: 0;
+    margin-top: 28px;
+    border-top: 1px solid var(--border);
+    padding-top: 0;
+  }
+
+  .nav-link {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 14px 24px 12px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    user-select: none;
+  }
+
+  .nav-link:hover { color: var(--text); }
+
+  .nav-link.active {
+    color: var(--gold);
+    border-bottom-color: var(--gold);
+  }
+
+  /* PAGE SECTIONS */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* SOBRE PAGE */
+  .sobre-wrap {
+    max-width: 740px;
+    margin: 0 auto;
+    padding: 60px 40px;
+  }
+
+  .sobre-wrap h1, .sobre-wrap h2, .sobre-wrap h3 {
+    font-family: var(--font-jp);
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 2em 0 0.6em;
+  }
+
+  .sobre-wrap h1 { font-size: 32px; color: var(--text); margin-top: 0; }
+  .sobre-wrap h2 { font-size: 20px; color: var(--gold); }
+  .sobre-wrap h3 { font-size: 15px; color: var(--red); letter-spacing: 0.05em; }
+
+  .sobre-wrap p {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--muted);
+    margin-bottom: 1em;
+  }
+
+  .sobre-wrap a { color: var(--gold); text-decoration: underline; }
+
+  .sobre-wrap ul, .sobre-wrap ol {
+    padding-left: 1.4em;
+    margin-bottom: 1em;
+  }
+
+  .sobre-wrap li {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--muted);
+    margin-bottom: 0.3em;
+  }
+
+  .sobre-wrap code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--surface);
+    color: var(--gold);
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+
+  .sobre-wrap blockquote {
+    border-left: 3px solid var(--red);
+    margin: 1.5em 0;
+    padding: 8px 20px;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .sobre-wrap hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2.5em 0;
+  }
+
+  .sobre-wrap strong { color: var(--text); font-weight: 700; }
+
+  /* ESTATÍSTICAS PAGE */
+  .stats-page-wrap {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+  }
+
+  .stat-chart-block {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    padding: 28px 32px;
+  }
+
+  .stat-bar-chart { display: flex; flex-direction: column; gap: 6px; }
+
+  .stat-bar-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 130px;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .stat-bar-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-align: right;
+  }
+
+  .stat-bar-track {
+    height: 20px;
+    background: var(--surface);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-bar-fill {
+    position: absolute;
+    left: 0; top: 0;
+    height: 100%;
+    animation: barGrow 0.5s ease both;
+  }
+
+  @keyframes barGrow {
+    from { width: 0 !important; }
+  }
+
+  .stat-bar-val {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--gold);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  /* Distributor stacked bar */
+  .dist-bar-track {
+    height: 20px;
+    display: flex;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .dist-seg {
+    height: 100%;
+    transition: opacity 0.15s;
+  }
+
+  .dist-seg:hover { opacity: 0.75; }
+
+  .dist-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-bottom: 16px;
+  }
+
+  .dist-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .dist-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
   .stats-bar {
     display: flex;
     gap: 0;
@@ -214,7 +406,7 @@
 
   .bar-row {
     display: grid;
-    grid-template-columns: 280px 1fr 130px;
+    grid-template-columns: 34px 280px 1fr 130px;
     gap: 12px;
     align-items: center;
     cursor: pointer;
@@ -332,7 +524,7 @@
     inset: 0;
     background-size: cover;
     background-position: center;
-    filter: brightness(0.2) blur(2px);
+    filter: brightness(0.4) blur(2px);
     transform: scale(1.05); /* hide blur edges */
     z-index: -1;
   }
@@ -517,6 +709,34 @@
     background: var(--surface);
   }
 
+  /* Poster thumbnails in chart + table */
+  .poster-thumb {
+    display: block;
+    object-fit: cover;
+    object-position: center top;
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .poster-thumb-chart {
+    width: 23px;
+    height: 34px;
+  }
+
+  .poster-thumb-table {
+    width: 53px;
+    height: 80px;
+  }
+
+  .poster-thumb-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    color: var(--border);
+    font-size: 12px;
+  }
+
   /* TABLE VIEW */
   .table-wrap {
     overflow-x: auto;
@@ -686,7 +906,14 @@
   <div class="header-eyebrow">// Dados de exibição cinematográfica</div>
   <h1>Anime<br>Box Office <span>Brasil</span></h1>
   <div class="header-sub">Filmes exibidos em salas brasileiras · ordenados por bilheteria total</div>
+  <nav class="site-nav">
+    <div class="nav-link active" data-page="home" onclick="setPage('home')">Home</div>
+    <div class="nav-link" data-page="estatisticas" onclick="setPage('estatisticas')">Estatísticas</div>
+    <div class="nav-link" data-page="sobre" onclick="setPage('sobre')">Sobre</div>
+  </nav>
 </header>
+
+<div id="page-home" class="page active">
 
 <div class="stats-bar" id="statsBar"></div>
 
@@ -701,7 +928,6 @@
   <div class="btn-group">
     <button class="btn active" data-sort="bilheteria" onclick="setSort('bilheteria')">Bilheteria</button>
     <button class="btn" data-sort="publico" onclick="setSort('publico')">Público</button>
-    <button class="btn" data-sort="pmi" onclick="setSort('pmi')">P.M.I.</button>
     <button class="btn" data-sort="estreia" onclick="setSort('estreia')">Mais Recente</button>
   </div>
   <div class="spacer"></div>
@@ -725,6 +951,7 @@
         <thead>
           <tr>
             <th>#</th>
+            <th>Poster</th>
             <th onclick="setSort('titulo')">Título</th>
             <th onclick="setSort('bilheteria')" id="th-bilheteria" class="sorted">Bilheteria ↓</th>
             <th onclick="setSort('publico')" id="th-publico">Público</th>
@@ -742,6 +969,20 @@
     </div>
   </div>
 </main>
+
+</div><!-- /#page-home -->
+
+<!-- ── ESTATÍSTICAS ─────────────────────────────────────── -->
+<div id="page-estatisticas" class="page">
+  <div class="stats-page-wrap">
+    <div id="estatisticasContent"></div>
+  </div>
+</div>
+
+<!-- ── SOBRE ────────────────────────────────────────────── -->
+<div id="page-sobre" class="page">
+  <div class="sobre-wrap" id="sobreContent"></div>
+</div>
 
 <script>
 // ─── CSV loader ────────────────────────────────────────────────────────────
@@ -818,7 +1059,6 @@ function renderStats() {
     <div class="stat-block"><div class="stat-label">Bilheteria Total</div><div class="stat-value">${fmt(totalBilh)}</div></div>
     <div class="stat-block"><div class="stat-label">Espectadores</div><div class="stat-value">${(totalPub/1e6).toFixed(1)}M</div></div>
     <div class="stat-block"><div class="stat-label">Sessões</div><div class="stat-value">${fmtNum(totalSess)}</div></div>
-    <div class="stat-block"><div class="stat-label" title="Média de pessoas por sessão">Ocupação Média ⓘ</div><div class="stat-value red">${avgOcup}</div></div>
     <div class="stat-block"><div class="stat-label">Filmes</div><div class="stat-value">${DATA.length}</div></div>
   `;
 }
@@ -838,15 +1078,20 @@ function renderChart() {
   const label = currentSort === 'publico' ? 'Top 15 · Público Total' : 'Top 15 · Bilheteria Total (R$)';
   document.querySelector('#chartView .section-title').textContent = label;
 
-  document.getElementById('barChart').innerHTML = data.map((d, i) => `
+  document.getElementById('barChart').innerHTML = data.map((d, i) => {
+    const posterSrc = d.cpb ? `posters/${d.cpb}.webp` : '';
+    const thumb = posterSrc
+      ? `<img class="poster-thumb poster-thumb-chart" src="${posterSrc}" alt="" loading="lazy" onerror="this.outerHTML='<div class=\\'poster-thumb poster-thumb-chart poster-thumb-placeholder\\'>🎬</div>'">`
+      : `<div class="poster-thumb poster-thumb-chart poster-thumb-placeholder">🎬</div>`;
+    return `
     <div class="bar-row" title="${fmtVal(d)}">
+      ${thumb}
       <div class="bar-name"><span class="bar-rank">${String(i+1).padStart(2,'0')}</span>${d.titulo}</div>
       <div class="bar-track">
         <div class="bar-fill ${i === 0 ? 'gold' : ''}" style="width:${(barVal(d)/maxVal*100).toFixed(1)}%; animation-delay:${i*0.04}s"></div>
       </div>
       <div class="bar-val">${fmtVal(d)}</div>
-    </div>
-  `).join('');
+    </div>`}).join('');
 }
 
 // ─── ClassInd badge ─────────────────────────────────────────────────────────
@@ -942,11 +1187,16 @@ function renderCards() {
 function renderTable() {
   const data = getFiltered();
   // sort key → 1-based nth-child index matching the <td> order
-  const colNth = { bilheteria: 3, publico: 4, sessoes: 5, ocupacao: 6, pmi: 7, maxSalas: 8, estreia: 11 };
+  const colNth = { bilheteria: 4, publico: 5, sessoes: 6, ocupacao: 7, pmi: 8, maxSalas: 9, estreia: 12 };
 
   document.getElementById('tableBody').innerHTML = data.map((d, i) => {
+    const posterSrc = d.cpb ? `posters/${d.cpb}.webp` : '';
+    const thumb = posterSrc
+      ? `<img class="poster-thumb poster-thumb-table" src="${posterSrc}" alt="" loading="lazy" onerror="this.outerHTML='<div class=\\'poster-thumb poster-thumb-table poster-thumb-placeholder\\'>🎬</div>'">`
+      : `<div class="poster-thumb poster-thumb-table poster-thumb-placeholder">🎬</div>`;
     return `<tr>
       <td class="td-rank">${i + 1}</td>
+      <td style="padding:4px 8px;">${thumb}</td>
       <td class="td-title">${d.titulo}</td>
       <td class="td-money">${d.bilheteria ? fmtFull(d.bilheteria) : '—'}</td>
       <td class="td-num">${d.publico ? fmtNum(d.publico) : '—'}</td>
@@ -1074,6 +1324,179 @@ function showError(msg) {
       </div>
     </div>`;
 }
+
+// ─── Markdown renderer ──────────────────────────────────────────────────────
+const SOBRE_MD = `
+# Sobre este projeto
+
+## O que é isto?
+
+Placeholder — edite a variável \`SOBRE_MD\` no código para adicionar seu conteúdo.
+
+## Metodologia
+
+Descreva aqui como os dados foram coletados e processados.
+
+## Fontes
+
+- Ancine — Painel OCA
+- Ancine — dados.gov.br
+- Database Brasil — FilmeB
+
+## Autor
+
+Quem fez isso e por quê.
+`;
+
+function renderMarkdown(md) {
+  return md
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/^---$/gm, '<hr>')
+    .replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+    .replace(/\n{2,}/g, '</p><p>')
+    .replace(/^(?!<[h|u|o|l|b|h])/gm, '')
+    .trim()
+    .replace(/^(.)/s, '<p>$1')
+    .replace(/(.)$/s, '$1</p>');
+}
+
+// ─── Statistics page ────────────────────────────────────────────────────────
+function renderStatisticas() {
+  if (!DATA.length) return;
+
+  // Group by year — only commercial releases (publico > 0)
+  const commercial = DATA.filter(d => d.publico > 0);
+  const years = [...new Set(commercial.map(d => d.estreia?.slice(0,4)).filter(Boolean))].sort();
+
+  const byYear = y => commercial.filter(d => d.estreia?.startsWith(y));
+
+  // Chart helpers
+  const BAR_HEIGHT = 28;
+  const GAP = 8;
+
+  function svgBarChart(rows, valueKey, fmtFn, colorFn) {
+    const max = Math.max(...rows.map(r => r[valueKey])) || 1;
+    const W = 100; // % width
+    return rows.map((r, i) => {
+      const pct = (r[valueKey] / max * 100).toFixed(1);
+      const color = colorFn ? colorFn(i) : 'var(--red)';
+      return `
+        <div class="stat-bar-row">
+          <div class="stat-bar-label">${r.label}</div>
+          <div class="stat-bar-track">
+            <div class="stat-bar-fill" style="width:${pct}%;background:${color};animation-delay:${i*0.05}s"></div>
+          </div>
+          <div class="stat-bar-val">${fmtFn(r[valueKey])}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // 1. Releases per year
+  const releasesRows = years.map(y => ({ label: y, value: byYear(y).length }));
+
+  // 2. Box office per year
+  const boxRows = years.map(y => ({
+    label: y,
+    value: byYear(y).reduce((s,d) => s + d.bilheteria, 0)
+  })).filter(r => r.value > 0);
+
+  // 3. Avg PMI per year
+  const pmiRows = years.map(y => {
+    const films = byYear(y).filter(d => d.pmi > 0);
+    return { label: y, value: films.length ? films.reduce((s,d) => s + d.pmi, 0) / films.length : 0 };
+  }).filter(r => r.value > 0);
+
+  // 4. Distributor market share per year — stacked % bar
+  function distShareHTML() {
+    const COLORS = ['#e63329','#c9a84c','#4a9eda','#6bcb77','#e8a838','#b56ce2','#e86060','#60c8e8','#c8e860'];
+    // Collect top distributors overall
+    const distTotals = {};
+    commercial.forEach(d => {
+      if (!d.distribuidora || !d.bilheteria) return;
+      distTotals[d.distribuidora] = (distTotals[d.distribuidora] || 0) + d.bilheteria;
+    });
+    const topDists = Object.entries(distTotals).sort((a,b) => b[1]-a[1]).slice(0,8).map(e => e[0]);
+
+    const legend = topDists.map((d,i) =>
+      `<span class="dist-legend-item"><span class="dist-legend-dot" style="background:${COLORS[i]}"></span>${d}</span>`
+    ).join('');
+
+    const bars = years.map(y => {
+      const films = byYear(y).filter(d => d.bilheteria > 0);
+      const total = films.reduce((s,d) => s + d.bilheteria, 0) || 1;
+      const segments = topDists.map((dist, i) => {
+        const share = films.filter(d => d.distribuidora === dist).reduce((s,d) => s + d.bilheteria, 0);
+        const pct = (share / total * 100).toFixed(1);
+        return pct > 0 ? `<div class="dist-seg" style="width:${pct}%;background:${COLORS[i]}" title="${dist}: ${pct}%"></div>` : '';
+      }).join('');
+      const otherShare = films.filter(d => !topDists.includes(d.distribuidora)).reduce((s,d) => s + d.bilheteria, 0);
+      const otherPct = (otherShare / total * 100).toFixed(1);
+      const otherSeg = otherPct > 0 ? `<div class="dist-seg" style="width:${otherPct}%;background:#444" title="Outros: ${otherPct}%"></div>` : '';
+
+      return `
+        <div class="stat-bar-row">
+          <div class="stat-bar-label">${y}</div>
+          <div class="dist-bar-track">${segments}${otherSeg}</div>
+          <div class="stat-bar-val" style="color:var(--muted)">${fmt(total)}</div>
+        </div>`;
+    }).join('');
+
+    return `<div class="dist-legend">${legend}</div>${bars}`;
+  }
+
+  const goldGrad = i => i === 0 ? 'var(--gold)' : 'var(--red)';
+
+  document.getElementById('estatisticasContent').innerHTML = `
+    <div class="stat-chart-block">
+      <div class="section-title">Lançamentos comerciais por ano</div>
+      <div class="stat-bar-chart">${svgBarChart(releasesRows, 'value', v => v + ' filmes', goldGrad)}</div>
+    </div>
+    <div class="stat-chart-block">
+      <div class="section-title">Bilheteria total por ano</div>
+      <div class="stat-bar-chart">${svgBarChart(boxRows, 'value', fmt, goldGrad)}</div>
+    </div>
+    <div class="stat-chart-block">
+      <div class="section-title">P.M.I. médio por ano</div>
+      <div class="stat-bar-chart">${svgBarChart(pmiRows, 'value', v => 'R$ ' + v.toFixed(2), goldGrad)}</div>
+    </div>
+    <div class="stat-chart-block">
+      <div class="section-title">Market share de distribuidoras por ano</div>
+      ${distShareHTML()}
+    </div>
+  `;
+}
+
+// ─── Page navigation ────────────────────────────────────────────────────────
+function setPage(page) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+  document.getElementById(`page-${page}`).classList.add('active');
+  document.querySelector(`.nav-link[data-page="${page}"]`).classList.add('active');
+  window.location.hash = page === 'home' ? '' : page;
+
+  if (page === 'sobre') {
+    document.getElementById('sobreContent').innerHTML = renderMarkdown(SOBRE_MD);
+  }
+  if (page === 'estatisticas') {
+    renderStatisticas();
+  }
+}
+
+// Handle hash on load
+(function() {
+  const hash = window.location.hash.replace('#', '');
+  if (hash && ['estatisticas', 'sobre'].includes(hash)) setPage(hash);
+})();
 
 // ─── Bootstrap ──────────────────────────────────────────────────────────────
 async function init() {
