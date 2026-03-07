@@ -315,7 +315,7 @@
 
   /* ── FRONT ── */
   .card-front {
-    background: var(--bg2);
+    background: transparent;
     display: flex;
     flex-direction: column;
     padding: 20px;
@@ -334,11 +334,11 @@
     background-position: center;
     filter: brightness(0.4) blur(2px);
     transform: scale(1.05); /* hide blur edges */
-    z-index: 0;
+    z-index: -1;
   }
 
   /* All front content sits above the bg */
-  .card-front > * { position: relative; z-index: 1; }
+  .card-front > *:not(.card-front-bg) { position: relative; z-index: 1; }
 
   .card-header-row {
     display: flex;
