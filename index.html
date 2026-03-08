@@ -1401,15 +1401,22 @@ async function renderStatisticas() {
   const distYears = [...new Set(distroRows.map(r => r.Ano))].sort();
   const dists     = [...new Set(distroRows.map(r => r.Distribuidora))];
 
-  // ── SVG vertical bar chart ───────────────────────────────────────────────
+  // ── SVG vertical bar chart (year-aware x axis) ──────────────────────────
   function verticalBarChart(labels, values, fmtFn, color = '#e63329') {
     const W = 600, H = 200, PAD = { t: 12, r: 8, b: 36, l: 60 };
     const chartW = W - PAD.l - PAD.r;
     const chartH = H - PAD.t - PAD.b;
     const max = Math.max(...values) || 1;
-    const barW = Math.max(4, Math.floor(chartW / labels.length * 0.55));
-    const gap  = chartW / labels.length;
     const ticks = 4;
+
+    const minY = Math.min(...labels.map(Number));
+    const maxY = Math.max(...labels.map(Number));
+    const yearSpan = maxY - minY || 1;
+    const xPos = y => PAD.l + ((Number(y) - minY) / yearSpan) * chartW;
+
+    // Bar width: ~70% of the average slot width
+    const slotW = chartW / (yearSpan + 1);
+    const barW = Math.max(3, Math.min(16, Math.floor(slotW * 0.7)));
 
     const grids = Array.from({length: ticks + 1}, (_, i) => {
       const v = max * i / ticks;
@@ -1418,61 +1425,87 @@ async function renderStatisticas() {
               <text x="${PAD.l-4}" y="${y+4}" text-anchor="end" fill="#555" font-size="8">${fmtFn(v)}</text>`;
     }).join('');
 
+    // X axis: draw every 5 years as a tick label
+    const xAxisYears = [];
+    for (let y = Math.ceil(minY/5)*5; y <= maxY; y += 5) xAxisYears.push(y);
+    const xAxis = xAxisYears.map(y =>
+      `<text x="${xPos(y)}" y="${H-PAD.b+14}" text-anchor="middle" fill="#444" font-size="8">${y}</text>
+       <line x1="${xPos(y)}" x2="${xPos(y)}" y1="${PAD.t+chartH}" y2="${PAD.t+chartH+3}" stroke="#444" stroke-width="1"/>`
+    ).join('');
+
     const bars = labels.map((lbl, i) => {
-      const v   = values[i];
-      const bh  = (v / max) * chartH;
-      const x   = PAD.l + gap * i + gap / 2 - barW / 2;
-      const y   = PAD.t + chartH - bh;
+      const v  = values[i];
+      const bh = (v / max) * chartH;
+      const cx = xPos(lbl);
+      const y  = PAD.t + chartH - bh;
       const top = v === max;
-      const skipLabel = labels.length > 15 && i % 2 !== 0;
-      return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${top ? '#c9a84c' : color}" rx="1" opacity="0.9">
+      return `<rect x="${cx - barW/2}" y="${y}" width="${barW}" height="${bh}"
+                fill="${top ? '#c9a84c' : color}" rx="1" opacity="0.9">
                 <title>${lbl}: ${fmtFn(v)}</title>
-              </rect>
-              ${!skipLabel ? `<text x="${x+barW/2}" y="${H-PAD.b+14}" text-anchor="middle" fill="#555" font-size="8">${lbl}</text>` : ''}`;
+              </rect>`;
     }).join('');
 
-    return `<div class="stat-svg-wrap"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;overflow:visible">${grids}${bars}</svg></div>`;
+    return `<div class="stat-svg-wrap"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;overflow:visible">${grids}${xAxis}${bars}</svg></div>`;
   }
 
-  // ── SVG line chart ───────────────────────────────────────────────────────
-  function lineChart(labels, values, fmtFn) {
+  // ── SVG line chart (year-aware x axis, integer y ticks) ─────────────────
+  function lineChart(labels, values, fmtFn, yStep = null) {
     if (labels.length < 2) return '<p style="color:var(--muted);font-size:12px;">Dados insuficientes.</p>';
     const W = 600, H = 180, PAD = { t: 12, r: 8, b: 36, l: 60 };
     const chartW = W - PAD.l - PAD.r;
     const chartH = H - PAD.t - PAD.b;
-    const min = Math.min(...values) * 0.9;
-    const max = Math.max(...values) * 1.05;
-    const range = max - min || 1;
-    const ticks = 4;
 
-    const px = i => PAD.l + (i / (labels.length - 1)) * chartW;
-    const py = v => PAD.t + chartH - ((v - min) / range) * chartH;
+    const minY = Math.min(...labels.map(Number));
+    const maxY = Math.max(...labels.map(Number));
+    const yearSpan = maxY - minY || 1;
+    const px = y => PAD.l + ((Number(y) - minY) / yearSpan) * chartW;
 
-    const grids = Array.from({length: ticks + 1}, (_, i) => {
-      const v = min + range * i / ticks;
+    const rawMin = Math.min(...values);
+    const rawMax = Math.max(...values);
+
+    // If yStep provided, snap min/max to that step for clean integer grid
+    let gridMin, gridMax;
+    if (yStep) {
+      gridMin = Math.floor(rawMin / yStep) * yStep;
+      gridMax = Math.ceil(rawMax  / yStep) * yStep;
+    } else {
+      gridMin = rawMin * 0.9;
+      gridMax = rawMax * 1.05;
+    }
+    const range = gridMax - gridMin || 1;
+    const py = v => PAD.t + chartH - ((v - gridMin) / range) * chartH;
+
+    // Y grid lines
+    const yTicks = yStep
+      ? Array.from({length: Math.round((gridMax - gridMin) / yStep) + 1}, (_, i) => gridMin + i * yStep)
+      : Array.from({length: 5}, (_, i) => gridMin + range * i / 4);
+
+    const grids = yTicks.map(v => {
       const y = py(v);
       return `<line x1="${PAD.l}" x2="${W-PAD.r}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
               <text x="${PAD.l-4}" y="${y+4}" text-anchor="end" fill="#555" font-size="8">${fmtFn(v)}</text>`;
     }).join('');
 
-    const pts = values.map((v, i) => `${px(i)},${py(v)}`).join(' ');
-    const area = `<polygon points="${PAD.l},${PAD.t+chartH} ${pts} ${PAD.l+chartW},${PAD.t+chartH}" fill="url(#lineGrad)" opacity="0.25"/>`;
-    const line = `<polyline points="${pts}" fill="none" stroke="#c9a84c" stroke-width="2" stroke-linejoin="round"/>`;
-
-    const dots = values.map((v, i) =>
-      `<circle cx="${px(i)}" cy="${py(v)}" r="3" fill="#c9a84c"><title>${labels[i]}: ${fmtFn(v)}</title></circle>`
+    // X axis ticks every 5 years
+    const xAxisYears = [];
+    for (let y = Math.ceil(minY/5)*5; y <= maxY; y += 5) xAxisYears.push(y);
+    const xAxis = xAxisYears.map(y =>
+      `<text x="${px(y)}" y="${H-PAD.b+14}" text-anchor="middle" fill="#444" font-size="8">${y}</text>
+       <line x1="${px(y)}" x2="${px(y)}" y1="${PAD.t+chartH}" y2="${PAD.t+chartH+3}" stroke="#444" stroke-width="1"/>`
     ).join('');
 
-    const skipLabel = labels.length > 15;
-    const lbls = labels.map((lbl, i) =>
-      (!skipLabel || i % 2 === 0) ? `<text x="${px(i)}" y="${H-PAD.b+14}" text-anchor="middle" fill="#555" font-size="8">${lbl}</text>` : ''
+    const pts  = labels.map((lbl, i) => `${px(lbl)},${py(values[i])}`).join(' ');
+    const area = `<polygon points="${PAD.l},${PAD.t+chartH} ${pts} ${px(labels[labels.length-1])},${PAD.t+chartH}" fill="url(#lineGrad)" opacity="0.25"/>`;
+    const line = `<polyline points="${pts}" fill="none" stroke="#c9a84c" stroke-width="2" stroke-linejoin="round"/>`;
+    const dots = labels.map((lbl, i) =>
+      `<circle cx="${px(lbl)}" cy="${py(values[i])}" r="3" fill="#c9a84c"><title>${lbl}: ${fmtFn(values[i])}</title></circle>`
     ).join('');
 
     return `<div class="stat-svg-wrap"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;overflow:visible">
       <defs><linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="#c9a84c"/><stop offset="100%" stop-color="#c9a84c" stop-opacity="0"/>
       </linearGradient></defs>
-      ${grids}${area}${line}${dots}${lbls}
+      ${grids}${xAxis}${area}${line}${dots}
     </svg></div>`;
   }
 
@@ -1550,7 +1583,7 @@ async function renderStatisticas() {
     </div>
     <div class="stat-chart-block">
       <div class="section-title">P.M.I. médio por ano</div>
-      ${lineChart(pmiFiltered.map(r=>r.label), pmiFiltered.map(r=>r.value), fmtPMI)}
+      ${lineChart(pmiFiltered.map(r=>r.label), pmiFiltered.map(r=>r.value), fmtPMI, 2)}
     </div>
     <div class="stat-chart-block">
       <div class="section-title">Market share de distribuidoras por ano</div>
