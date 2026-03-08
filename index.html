@@ -511,7 +511,7 @@
     inset: 0;
     background-size: cover;
     background-position: center;
-    filter: brightness(0.4) blur(2px);
+    filter: brightness(0.2) blur(2px);
     transform: scale(1.05); /* hide blur edges */
     z-index: -1;
   }
@@ -1025,15 +1025,20 @@ function getFiltered() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   let data = DATA.filter(d => !q || d.titulo.toLowerCase().includes(q) || d.distribuidora.toLowerCase().includes(q));
   data.sort((a, b) => {
+    // "Mais Recente" sorts by última sessão registrada first, then estreia as tiebreaker
+    if (currentSort === 'estreia') {
+      const cmp = (x, y) => {
+        if (!x && !y) return 0;
+        if (!x) return 1;
+        if (!y) return -1;
+        return y.localeCompare(x); // always descending (most recent first)
+      };
+      const primary = cmp(a.ultimaSessao, b.ultimaSessao);
+      return primary !== 0 ? primary : cmp(a.estreia, b.estreia);
+    }
     const av = a[currentSort] ?? '';
     const bv = b[currentSort] ?? '';
     if (typeof av === 'number') return sortDir === 1 ? bv - av : av - bv;
-    // For date strings: empty values always sink to the bottom
-    if (currentSort === 'estreia') {
-      if (!av && !bv) return 0;
-      if (!av) return 1;
-      if (!bv) return -1;
-    }
     return sortDir === 1 ? String(bv).localeCompare(String(av)) : String(av).localeCompare(String(bv));
   });
   return data;
@@ -1235,6 +1240,7 @@ function parseCSV(text) {
   const iMunic      = col('Municípios');
   const iComent     = col('Comentários');
   const iClassInd   = col('ClassInd');
+  const iUltSessao  = col('Última sessão registrada');
   const iPMI        = col('P.M.I.');
 
   const rows = [];
@@ -1265,6 +1271,7 @@ function parseCSV(text) {
       municipios:   parseInt(cells[iMunic])  || 0,
       classind:     (cells[iClassInd] || '').trim(),
       comentarios:  (cells[iComent] || '').trim(),
+      ultimaSessao: (cells[iUltSessao] || '').trim(),
     });
   }
 
@@ -1360,172 +1367,190 @@ function renderMarkdown(md) {
 }
 
 // ─── Statistics page ────────────────────────────────────────────────────────
-function renderStatisticas() {
-  if (!DATA.length) return;
+async function renderStatisticas() {
+  const el = document.getElementById('estatisticasContent');
+  el.innerHTML = `<div style="padding:60px;text-align:center;color:var(--muted);letter-spacing:0.2em;font-size:12px;">CARREGANDO...</div>`;
 
-  const commercial = DATA.filter(d => d.publico > 0);
-  const allYears = [...new Set(DATA.map(d => d.estreia?.slice(0,4)).filter(Boolean))].sort();
-  const commYears = [...new Set(commercial.map(d => d.estreia?.slice(0,4)).filter(Boolean))].sort();
+  // ── Fetch both CSVs ──────────────────────────────────────────────────────
+  function parseSimpleCSV(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const lines = text.trim().split(/\r?\n/);
+    const headers = lines[0].split(',').map(h => h.trim());
+    return lines.slice(1).map(line => {
+      const cells = line.split(',');
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = (cells[i] || '').trim());
+      return obj;
+    });
+  }
 
-  const byYear = y => commercial.filter(d => d.estreia?.startsWith(y));
+  let statsRows, distroRows;
+  try {
+    const [sr, dr] = await Promise.all([
+      fetch('statistics_report.csv', { cache: 'no-cache' }).then(r => r.text()),
+      fetch('distro_report.csv',     { cache: 'no-cache' }).then(r => r.text()),
+    ]);
+    statsRows = parseSimpleCSV(sr).sort((a,b) => a.Ano - b.Ano);
+    distroRows = parseSimpleCSV(dr);
+  } catch(e) {
+    el.innerHTML = `<div style="padding:60px;text-align:center;color:var(--red);">Erro ao carregar CSVs de estatísticas.</div>`;
+    return;
+  }
 
-  // ── Vertical bar chart (SVG) ────────────────────────────────────────────────
-  function verticalBarChart(rows, fmtFn, color = '#e63329') {
-    const W = 600, H = 200, PAD = { t: 12, r: 8, b: 36, l: 52 };
+  const years     = statsRows.map(r => r.Ano);
+  const distYears = [...new Set(distroRows.map(r => r.Ano))].sort();
+  const dists     = [...new Set(distroRows.map(r => r.Distribuidora))];
+
+  // ── SVG vertical bar chart ───────────────────────────────────────────────
+  function verticalBarChart(labels, values, fmtFn, color = '#e63329') {
+    const W = 600, H = 200, PAD = { t: 12, r: 8, b: 36, l: 60 };
     const chartW = W - PAD.l - PAD.r;
     const chartH = H - PAD.t - PAD.b;
-    const max = Math.max(...rows.map(r => r.value)) || 1;
-    const barW = Math.floor(chartW / rows.length * 0.6);
-    const gap   = chartW / rows.length;
-
-    // Y axis gridlines + labels
+    const max = Math.max(...values) || 1;
+    const barW = Math.max(4, Math.floor(chartW / labels.length * 0.55));
+    const gap  = chartW / labels.length;
     const ticks = 4;
+
     const grids = Array.from({length: ticks + 1}, (_, i) => {
       const v = max * i / ticks;
       const y = PAD.t + chartH - (v / max * chartH);
-      return `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-              <text x="${PAD.l - 4}" y="${y + 4}" text-anchor="end" fill="#666" font-size="8">${fmtFn(v)}</text>`;
+      return `<line x1="${PAD.l}" x2="${W-PAD.r}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+              <text x="${PAD.l-4}" y="${y+4}" text-anchor="end" fill="#555" font-size="8">${fmtFn(v)}</text>`;
     }).join('');
 
-    const bars = rows.map((r, i) => {
-      const x = PAD.l + gap * i + gap / 2 - barW / 2;
-      const bh = (r.value / max) * chartH;
-      const y = PAD.t + chartH - bh;
-      const isMax = r.value === max;
-      return `
-        <rect x="${x}" y="${y}" width="${barW}" height="${bh}"
-              fill="${isMax ? '#c9a84c' : color}" rx="1"
-              opacity="0.9">
-          <title>${r.label}: ${fmtFn(r.value)}</title>
-        </rect>
-        <text x="${x + barW/2}" y="${H - PAD.b + 14}" text-anchor="middle" fill="#666" font-size="9">${r.label}</text>`;
+    const bars = labels.map((lbl, i) => {
+      const v   = values[i];
+      const bh  = (v / max) * chartH;
+      const x   = PAD.l + gap * i + gap / 2 - barW / 2;
+      const y   = PAD.t + chartH - bh;
+      const top = v === max;
+      const skipLabel = labels.length > 15 && i % 2 !== 0;
+      return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${top ? '#c9a84c' : color}" rx="1" opacity="0.9">
+                <title>${lbl}: ${fmtFn(v)}</title>
+              </rect>
+              ${!skipLabel ? `<text x="${x+barW/2}" y="${H-PAD.b+14}" text-anchor="middle" fill="#555" font-size="8">${lbl}</text>` : ''}`;
     }).join('');
 
-    return `<div class="stat-svg-wrap"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;overflow:visible">
-      ${grids}${bars}
-    </svg></div>`;
+    return `<div class="stat-svg-wrap"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;overflow:visible">${grids}${bars}</svg></div>`;
   }
 
-  // ── Line chart (SVG) ────────────────────────────────────────────────────────
-  function lineChart(rows, fmtFn) {
-    const W = 600, H = 180, PAD = { t: 12, r: 8, b: 36, l: 52 };
+  // ── SVG line chart ───────────────────────────────────────────────────────
+  function lineChart(labels, values, fmtFn) {
+    if (labels.length < 2) return '<p style="color:var(--muted);font-size:12px;">Dados insuficientes.</p>';
+    const W = 600, H = 180, PAD = { t: 12, r: 8, b: 36, l: 60 };
     const chartW = W - PAD.l - PAD.r;
     const chartH = H - PAD.t - PAD.b;
-    const min = Math.min(...rows.map(r => r.value)) * 0.85;
-    const max = Math.max(...rows.map(r => r.value)) * 1.05;
+    const min = Math.min(...values) * 0.9;
+    const max = Math.max(...values) * 1.05;
     const range = max - min || 1;
-
-    const pt = (r, i) => {
-      const x = PAD.l + (i / (rows.length - 1)) * chartW;
-      const y = PAD.t + chartH - ((r.value - min) / range) * chartH;
-      return `${x},${y}`;
-    };
-
     const ticks = 4;
+
+    const px = i => PAD.l + (i / (labels.length - 1)) * chartW;
+    const py = v => PAD.t + chartH - ((v - min) / range) * chartH;
+
     const grids = Array.from({length: ticks + 1}, (_, i) => {
       const v = min + range * i / ticks;
-      const y = PAD.t + chartH - (i / ticks * chartH);
-      return `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-              <text x="${PAD.l - 4}" y="${y + 4}" text-anchor="end" fill="#666" font-size="8">${fmtFn(v)}</text>`;
+      const y = py(v);
+      return `<line x1="${PAD.l}" x2="${W-PAD.r}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+              <text x="${PAD.l-4}" y="${y+4}" text-anchor="end" fill="#555" font-size="8">${fmtFn(v)}</text>`;
     }).join('');
 
-    const points = rows.map(pt).join(' ');
+    const pts = values.map((v, i) => `${px(i)},${py(v)}`).join(' ');
+    const area = `<polygon points="${PAD.l},${PAD.t+chartH} ${pts} ${PAD.l+chartW},${PAD.t+chartH}" fill="url(#lineGrad)" opacity="0.25"/>`;
+    const line = `<polyline points="${pts}" fill="none" stroke="#c9a84c" stroke-width="2" stroke-linejoin="round"/>`;
 
-    // Area fill — close path under the line
-    const firstX = PAD.l, lastX = PAD.l + chartW;
-    const baseY = PAD.t + chartH;
-    const area = `<polygon points="${firstX},${baseY} ${points} ${lastX},${baseY}" fill="url(#lineGrad)" opacity="0.3"/>`;
+    const dots = values.map((v, i) =>
+      `<circle cx="${px(i)}" cy="${py(v)}" r="3" fill="#c9a84c"><title>${labels[i]}: ${fmtFn(v)}</title></circle>`
+    ).join('');
 
-    const dots = rows.map((r, i) => {
-      const [x, y] = pt(r, i).split(',');
-      return `<circle cx="${x}" cy="${y}" r="3" fill="#c9a84c">
-        <title>${r.label}: ${fmtFn(r.value)}</title>
-      </circle>`;
-    }).join('');
-
-    const labels = rows.map((r, i) => {
-      const x = PAD.l + (i / (rows.length - 1)) * chartW;
-      return `<text x="${x}" y="${H - PAD.b + 14}" text-anchor="middle" fill="#666" font-size="9">${r.label}</text>`;
-    }).join('');
+    const skipLabel = labels.length > 15;
+    const lbls = labels.map((lbl, i) =>
+      (!skipLabel || i % 2 === 0) ? `<text x="${px(i)}" y="${H-PAD.b+14}" text-anchor="middle" fill="#555" font-size="8">${lbl}</text>` : ''
+    ).join('');
 
     return `<div class="stat-svg-wrap"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;overflow:visible">
-      <defs>
-        <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#c9a84c"/>
-          <stop offset="100%" stop-color="#c9a84c" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-      ${grids}
-      ${area}
-      <polyline points="${points}" fill="none" stroke="#c9a84c" stroke-width="2" stroke-linejoin="round"/>
-      ${dots}${labels}
+      <defs><linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#c9a84c"/><stop offset="100%" stop-color="#c9a84c" stop-opacity="0"/>
+      </linearGradient></defs>
+      ${grids}${area}${line}${dots}${lbls}
     </svg></div>`;
   }
 
-  // ── Data prep ───────────────────────────────────────────────────────────────
-  const releasesRows = commYears.map(y => ({ label: y, value: byYear(y).length }));
-
-  const boxRows = commYears.map(y => ({
-    label: y,
-    value: byYear(y).reduce((s,d) => s + d.bilheteria, 0)
-  })).filter(r => r.value > 0);
-
-  const pmiRows = commYears.map(y => {
-    const films = byYear(y).filter(d => d.pmi > 0);
-    return { label: y, value: films.length ? films.reduce((s,d) => s + d.pmi, 0) / films.length : 0 };
-  }).filter(r => r.value > 0);
-
-  // ── Distributor stacked bar ─────────────────────────────────────────────────
+  // ── Stacked distributor bars ─────────────────────────────────────────────
   function distShareHTML() {
     const COLORS = ['#e63329','#c9a84c','#4a9eda','#6bcb77','#e8a838','#b56ce2','#e86060','#60c8e8'];
-    const distTotals = {};
-    commercial.forEach(d => {
-      if (!d.distribuidora || !d.bilheteria) return;
-      distTotals[d.distribuidora] = (distTotals[d.distribuidora] || 0) + d.bilheteria;
+    // Rank distributors by total bilheteria
+    const totals = {};
+    distroRows.forEach(r => {
+      totals[r.Distribuidora] = (totals[r.Distribuidora] || 0) + parseFloat(r.Bilheteria || 0);
     });
-    const topDists = Object.entries(distTotals).sort((a,b) => b[1]-a[1]).slice(0,8).map(e => e[0]);
+    const topDists = Object.entries(totals).sort((a,b) => b[1]-a[1]).map(e => e[0]);
 
     const legend = [
-      ...topDists.map((d,i) => `<span class="dist-legend-item"><span class="dist-legend-dot" style="background:${COLORS[i]}"></span>${d}</span>`),
+      ...topDists.map((d,i) => `<span class="dist-legend-item"><span class="dist-legend-dot" style="background:${COLORS[i] || '#888'}"></span>${d}</span>`),
       `<span class="dist-legend-item"><span class="dist-legend-dot" style="background:#444"></span>Outros</span>`
     ].join('');
 
-    const bars = commYears.map(y => {
-      const films = byYear(y).filter(d => d.bilheteria > 0);
-      const total = films.reduce((s,d) => s + d.bilheteria, 0) || 1;
-      const segments = topDists.map((dist, i) => {
-        const share = films.filter(d => d.distribuidora === dist).reduce((s,d) => s + d.bilheteria, 0);
-        const pct = (share / total * 100).toFixed(1);
-        return parseFloat(pct) > 0 ? `<div class="dist-seg" style="width:${pct}%;background:${COLORS[i]}" title="${dist}: ${pct}%"></div>` : '';
+    const bars = distYears.map(y => {
+      const rows = distroRows.filter(r => r.Ano === y && parseFloat(r.Bilheteria) > 0);
+      const total = rows.reduce((s,r) => s + parseFloat(r.Bilheteria), 0) || 1;
+      const segs = topDists.map((dist, i) => {
+        const row = rows.find(r => r.Distribuidora === dist);
+        const val = row ? parseFloat(row.Bilheteria) : 0;
+        const pct = (val / total * 100).toFixed(1);
+        return parseFloat(pct) > 0
+          ? `<div class="dist-seg" style="width:${pct}%;background:${COLORS[i] || '#888'}" title="${dist}: ${pct}%"></div>` : '';
       }).join('');
-      const otherShare = films.filter(d => !topDists.includes(d.distribuidora)).reduce((s,d) => s + d.bilheteria, 0);
-      const otherPct = (otherShare / total * 100).toFixed(1);
-      const otherSeg = parseFloat(otherPct) > 0 ? `<div class="dist-seg" style="width:${otherPct}%;background:#444" title="Outros: ${otherPct}%"></div>` : '';
-      return `
-        <div class="stat-bar-row">
-          <div class="stat-bar-label">${y}</div>
-          <div class="dist-bar-track">${segments}${otherSeg}</div>
-          <div class="stat-bar-val" style="color:var(--muted)">${fmt(total)}</div>
-        </div>`;
+      const knownTotal = topDists.reduce((s, dist) => {
+        const row = rows.find(r => r.Distribuidora === dist);
+        return s + (row ? parseFloat(row.Bilheteria) : 0);
+      }, 0);
+      const otherPct = ((total - knownTotal) / total * 100).toFixed(1);
+      const otherSeg = parseFloat(otherPct) > 0
+        ? `<div class="dist-seg" style="width:${otherPct}%;background:#444" title="Outros: ${otherPct}%"></div>` : '';
+      return `<div class="stat-bar-row">
+        <div class="stat-bar-label">${y}</div>
+        <div class="dist-bar-track">${segs}${otherSeg}</div>
+        <div class="stat-bar-val" style="color:var(--muted)">${fmt(total)}</div>
+      </div>`;
     }).join('');
 
     return `<div class="dist-legend">${legend}</div>${bars}`;
   }
 
-  const fmtShort = v => v >= 1e6 ? 'R$' + (v/1e6).toFixed(0) + 'M' : v >= 1e3 ? (v/1e3).toFixed(0) + 'k' : String(Math.round(v));
+  // ── Format helpers ───────────────────────────────────────────────────────
+  const fmtShort = v => v >= 1e6 ? 'R$'+(v/1e6).toFixed(0)+'M' : v >= 1e3 ? 'R$'+(v/1e3).toFixed(0)+'k' : 'R$'+Math.round(v);
+  const fmtCount = v => Math.round(v) || '';
+  const fmtPMI   = v => 'R$'+v.toFixed(2);
 
-  document.getElementById('estatisticasContent').innerHTML = `
+  // ── Extract series from statsRows ────────────────────────────────────────
+  const bilhSeries    = statsRows.map(r => parseFloat(r.Bilheteria) || 0);
+  const estrSeries    = statsRows.map(r => parseInt(r.Estreias) || 0);
+
+  // PMI only available via distro data grouped by year — compute from stats bilheteria/publico
+  const pmiSeries     = statsRows.map(r => {
+    const b = parseFloat(r.Bilheteria) || 0;
+    const p = parseFloat(r.Público)    || 0;
+    return p > 0 ? b / p : 0;
+  });
+  // Filter out years with no PMI data for the line chart
+  const pmiFiltered = statsRows.reduce((acc, r, i) => {
+    if (pmiSeries[i] > 0) acc.push({ label: r.Ano, value: pmiSeries[i] });
+    return acc;
+  }, []);
+
+  el.innerHTML = `
     <div class="stat-chart-block">
-      <div class="section-title">Lançamentos comerciais por ano</div>
-      ${verticalBarChart(releasesRows, v => Math.round(v) || '', '#e63329')}
+      <div class="section-title">Estreias comerciais por ano</div>
+      ${verticalBarChart(years, estrSeries, fmtCount)}
     </div>
     <div class="stat-chart-block">
       <div class="section-title">Bilheteria total por ano</div>
-      ${verticalBarChart(boxRows, fmtShort, '#e63329')}
+      ${verticalBarChart(years, bilhSeries, fmtShort)}
     </div>
     <div class="stat-chart-block">
       <div class="section-title">P.M.I. médio por ano</div>
-      ${lineChart(pmiRows, v => 'R$' + v.toFixed(0))}
+      ${lineChart(pmiFiltered.map(r=>r.label), pmiFiltered.map(r=>r.value), fmtPMI)}
     </div>
     <div class="stat-chart-block">
       <div class="section-title">Market share de distribuidoras por ano</div>
@@ -1533,6 +1558,7 @@ function renderStatisticas() {
     </div>
   `;
 }
+
 
 // ─── Page navigation ────────────────────────────────────────────────────────
 function setPage(page) {
