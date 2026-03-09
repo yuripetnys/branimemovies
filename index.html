@@ -1327,28 +1327,6 @@ function showError(msg) {
 }
 
 // ─── Markdown renderer ──────────────────────────────────────────────────────
-const SOBRE_MD = `
-# Sobre este projeto
-
-## O que é isto?
-
-Placeholder — edite a variável \`SOBRE_MD\` no código para adicionar seu conteúdo.
-
-## Metodologia
-
-Descreva aqui como os dados foram coletados e processados.
-
-## Fontes
-
-- Ancine — Painel OCA
-- Ancine — dados.gov.br
-- Database Brasil — FilmeB
-
-## Autor
-
-Quem fez isso e por quê.
-`;
-
 function renderMarkdown(md) {
   return md
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -1389,22 +1367,16 @@ async function renderStatisticas() {
     });
   }
 
-  let statsRows, distroRows;
+  let statsRows;
   try {
-    const [sr, dr] = await Promise.all([
-      fetch('statistics_report.csv', { cache: 'no-cache' }).then(r => r.text()),
-      fetch('distro_report.csv',     { cache: 'no-cache' }).then(r => r.text()),
-    ]);
+    const sr = await fetch('statistics_report.csv', { cache: 'no-cache' }).then(r => r.text());
     statsRows = parseSimpleCSV(sr).sort((a,b) => a.Ano - b.Ano);
-    distroRows = parseSimpleCSV(dr);
   } catch(e) {
-    el.innerHTML = `<div style="padding:60px;text-align:center;color:var(--red);">Erro ao carregar CSVs de estatísticas.</div>`;
+    el.innerHTML = `<div style="padding:60px;text-align:center;color:var(--red);">Erro ao carregar CSV de estatísticas.</div>`;
     return;
   }
 
-  const years     = statsRows.map(r => r.Ano);
-  const distYears = [...new Set(distroRows.map(r => r.Ano))].sort();
-  const dists     = [...new Set(distroRows.map(r => r.Distribuidora))];
+  const years = statsRows.map(r => r.Ano);
 
   // ── SVG vertical bar chart (year-aware x axis) ──────────────────────────
   function verticalBarChart(labels, values, fmtFn, color = '#e63329') {
@@ -1514,64 +1486,20 @@ async function renderStatisticas() {
     </svg></div>`;
   }
 
-  // ── Stacked distributor bars ─────────────────────────────────────────────
-  function distShareHTML() {
-    const COLORS = ['#e63329','#c9a84c','#4a9eda','#6bcb77','#e8a838','#b56ce2','#e86060','#60c8e8'];
-    // Rank distributors by total bilheteria
-    const totals = {};
-    distroRows.forEach(r => {
-      totals[r.Distribuidora] = (totals[r.Distribuidora] || 0) + parseFloat(r.Bilheteria || 0);
-    });
-    const topDists = Object.entries(totals).sort((a,b) => b[1]-a[1]).map(e => e[0]);
-
-    const legend = [
-      ...topDists.map((d,i) => `<span class="dist-legend-item"><span class="dist-legend-dot" style="background:${COLORS[i] || '#888'}"></span>${d}</span>`),
-      `<span class="dist-legend-item"><span class="dist-legend-dot" style="background:#444"></span>Outros</span>`
-    ].join('');
-
-    const bars = distYears.map(y => {
-      const rows = distroRows.filter(r => r.Ano === y && parseFloat(r.Bilheteria) > 0);
-      const total = rows.reduce((s,r) => s + parseFloat(r.Bilheteria), 0) || 1;
-      const segs = topDists.map((dist, i) => {
-        const row = rows.find(r => r.Distribuidora === dist);
-        const val = row ? parseFloat(row.Bilheteria) : 0;
-        const pct = (val / total * 100).toFixed(1);
-        return parseFloat(pct) > 0
-          ? `<div class="dist-seg" style="width:${pct}%;background:${COLORS[i] || '#888'}" title="${dist}: ${pct}%"></div>` : '';
-      }).join('');
-      const knownTotal = topDists.reduce((s, dist) => {
-        const row = rows.find(r => r.Distribuidora === dist);
-        return s + (row ? parseFloat(row.Bilheteria) : 0);
-      }, 0);
-      const otherPct = ((total - knownTotal) / total * 100).toFixed(1);
-      const otherSeg = parseFloat(otherPct) > 0
-        ? `<div class="dist-seg" style="width:${otherPct}%;background:#444" title="Outros: ${otherPct}%"></div>` : '';
-      return `<div class="stat-bar-row">
-        <div class="stat-bar-label">${y}</div>
-        <div class="dist-bar-track">${segs}${otherSeg}</div>
-        <div class="stat-bar-val" style="color:var(--muted)">${fmt(total)}</div>
-      </div>`;
-    }).join('');
-
-    return `<div class="dist-legend">${legend}</div>${bars}`;
-  }
-
   // ── Format helpers ───────────────────────────────────────────────────────
   const fmtShort = v => v >= 1e6 ? 'R$'+(v/1e6).toFixed(0)+'M' : v >= 1e3 ? 'R$'+(v/1e3).toFixed(0)+'k' : 'R$'+Math.round(v);
   const fmtCount = v => Math.round(v) || '';
   const fmtPMI   = v => 'R$'+v.toFixed(2);
 
   // ── Extract series from statsRows ────────────────────────────────────────
-  const bilhSeries    = statsRows.map(r => parseFloat(r.Bilheteria) || 0);
-  const estrSeries    = statsRows.map(r => parseInt(r.Estreias) || 0);
+  const bilhSeries = statsRows.map(r => parseFloat(r.Bilheteria) || 0);
+  const estrSeries = statsRows.map(r => parseInt(r.Estreias) || 0);
 
-  // PMI only available via distro data grouped by year — compute from stats bilheteria/publico
-  const pmiSeries     = statsRows.map(r => {
+  const pmiSeries  = statsRows.map(r => {
     const b = parseFloat(r.Bilheteria) || 0;
     const p = parseFloat(r.Público)    || 0;
     return p > 0 ? b / p : 0;
   });
-  // Filter out years with no PMI data for the line chart
   const pmiFiltered = statsRows.reduce((acc, r, i) => {
     if (pmiSeries[i] > 0) acc.push({ label: r.Ano, value: pmiSeries[i] });
     return acc;
@@ -1590,10 +1518,6 @@ async function renderStatisticas() {
       <div class="section-title">P.M.I. médio por ano</div>
       ${lineChart(pmiFiltered.map(r=>r.label), pmiFiltered.map(r=>r.value), fmtPMI, 2)}
     </div>
-    <div class="stat-chart-block">
-      <div class="section-title">Market share de distribuidoras por ano</div>
-      ${distShareHTML()}
-    </div>
   `;
 }
 
@@ -1607,7 +1531,12 @@ function setPage(page) {
   window.location.hash = page === 'home' ? '' : page;
 
   if (page === 'sobre') {
-    document.getElementById('sobreContent').innerHTML = renderMarkdown(SOBRE_MD);
+    const el = document.getElementById('sobreContent');
+    el.innerHTML = `<div style="padding:60px;text-align:center;color:var(--muted);letter-spacing:0.2em;font-size:12px;">CARREGANDO...</div>`;
+    fetch('sobre.md', { cache: 'no-cache' })
+      .then(r => r.text())
+      .then(md => { el.innerHTML = renderMarkdown(md); })
+      .catch(() => { el.innerHTML = `<div style="padding:60px;text-align:center;color:var(--red);">Erro ao carregar sobre.md.</div>`; });
   }
   if (page === 'estatisticas') {
     renderStatisticas();
