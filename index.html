@@ -1115,8 +1115,11 @@ function renderCards() {
   }
   document.getElementById('emptyMsg').style.display = 'none';
   document.getElementById('cardsGrid').innerHTML = data.map((d, i) => {
+    const isEstimado = d.tipoBilh === 'Estimado';
+    const bilhTitle  = isEstimado ? ' title="Valor estimado com base no PMI histórico do ano"' : '';
+    const bilhSuffix = isEstimado ? ' <span style="font-size:9px;opacity:0.6;cursor:help;" title="Valor estimado com base no PMI histórico do ano">~</span>' : '';
     const metrics = [
-      d.bilheteria ? `<div class="metric"><div class="metric-label">Bilheteria</div><div class="metric-value highlight">${fmt(d.bilheteria)}</div></div>` : '',
+      d.bilheteria ? `<div class="metric"><div class="metric-label">Bilheteria</div><div class="metric-value highlight"${bilhTitle}>${fmt(d.bilheteria)}${bilhSuffix}</div></div>` : '',
       d.publico    ? `<div class="metric"><div class="metric-label">Público</div><div class="metric-value">${fmtNum(d.publico)}</div></div>` : '',
       d.estreia    ? `<div class="metric"><div class="metric-label">Estreia</div><div class="metric-value">${d.estreia}</div></div>` : '',
       d.ocupacao   ? `<div class="metric"><div class="metric-label" title="Média de pessoas por sessão">Ocupação ⓘ</div><div class="metric-value">${d.ocupacao.toFixed(1)}</div></div>` : '',
@@ -1192,7 +1195,7 @@ function renderTable() {
       <td class="td-rank">${i + 1}</td>
       <td class="td-poster">${thumb}</td>
       <td class="td-title">${d.titulo}</td>
-      <td class="td-money">${d.bilheteria ? fmtFull(d.bilheteria) : '—'}</td>
+      <td class="td-money">${d.bilheteria ? `<span${d.tipoBilh === 'Estimado' ? ' title="Valor estimado com base no PMI histórico do ano" style="cursor:help;"' : ''}>${fmtFull(d.bilheteria)}${d.tipoBilh === 'Estimado' ? ' <span style="opacity:0.5;font-size:9px;">~</span>' : ''}</span>` : '—'}</td>
       <td class="td-num">${d.publico ? fmtNum(d.publico) : '—'}</td>
       <td class="td-num">${d.sessoes ? fmtNum(d.sessoes) : '—'}</td>
       <td class="td-pct">${d.ocupacao ? '<span class="pct-pill" title="Média de pessoas por sessão">' + d.ocupacao.toFixed(1) + '</span>' : '—'}</td>
@@ -1242,6 +1245,7 @@ function parseCSV(text) {
   const iClassInd   = col('ClassInd');
   const iUltSessao  = col('Última sessão registrada');
   const iPMI        = col('P.M.I.');
+  const iTipoBilh   = col('Tipo de Bilheteria');
 
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
@@ -1272,6 +1276,7 @@ function parseCSV(text) {
       classind:     (cells[iClassInd] || '').trim(),
       comentarios:  (cells[iComent] || '').trim(),
       ultimaSessao: (cells[iUltSessao] || '').trim(),
+      tipoBilh:     (cells[iTipoBilh] || '').trim(),
     });
   }
 
